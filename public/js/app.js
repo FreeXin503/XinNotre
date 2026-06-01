@@ -170,6 +170,25 @@ function setupFullstackUI() {
     btnLogout.addEventListener('click', handleLogout);
     sidebarUser.appendChild(btnLogout);
   }
+
+  // 6. 绑定开发天团模态框事件
+  const devSquadModal = document.getElementById('dev-squad-modal');
+  const btnShowDevSquad = document.getElementById('btn-show-dev-squad');
+  const btnCloseDevSquad = document.getElementById('btn-close-dev-squad');
+  const btnCloseDevSquadAction = document.getElementById('btn-close-dev-squad-action');
+
+  if (btnShowDevSquad && devSquadModal) {
+    btnShowDevSquad.addEventListener('click', () => {
+      devSquadModal.style.display = 'flex';
+    });
+  }
+
+  const hideDevSquad = () => {
+    if (devSquadModal) devSquadModal.style.display = 'none';
+  };
+
+  if (btnCloseDevSquad) btnCloseDevSquad.addEventListener('click', hideDevSquad);
+  if (btnCloseDevSquadAction) btnCloseDevSquadAction.addEventListener('click', hideDevSquad);
 }
 
 async function checkAuthAndInit() {
