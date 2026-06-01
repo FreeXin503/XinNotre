@@ -1549,3 +1549,127 @@
 #btn-fullstack-logout:hover {
     color: #ff6b6b !important;
 }
+
+/* ==================== 🔐 登录/注册全栈模块模态框样式 (Auth Styles) ==================== */
+
+.auth-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(15, 16, 20, 0.96), rgba(5, 5, 8, 0.99));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: fadeIn 0.4s ease;
+}
+
+.auth-card {
+  background: rgba(30, 31, 35, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 28px;
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  text-align: center;
+  transform: translateY(0);
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.auth-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  background: var(--gradient-gemini);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.auth-subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+.auth-input-group {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.auth-input-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.auth-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 14px !important;
+  padding: 14px 18px !important;
+  color: #fff !important;
+  font-size: 15px !important;
+  outline: none !important;
+  transition: all 0.3s !important;
+}
+
+.auth-input:focus {
+  border-color: var(--primary) !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 0 0 4px var(--primary-glow) !important;
+}
+
+.auth-btn {
+  width: 100%;
+  background: var(--gradient-gemini) !important;
+  background-size: 200% auto !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 14px !important;
+  padding: 16px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  margin-top: 16px !important;
+  transition: all 0.3s !important;
+}
+
+.auth-btn:hover {
+  background-position: right center !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(155, 114, 203, 0.3) !important;
+}
+
+.auth-btn:active {
+  transform: translateY(1px) !important;
+}
+
+.auth-toggle {
+  margin-top: 24px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.auth-toggle span {
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.auth-error {
+  color: #ff6b6b;
+  font-size: 13px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 16px;
+}
