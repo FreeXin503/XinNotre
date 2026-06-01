@@ -583,3 +583,62 @@ function debounce(func, wait) {
     timeout = setTimeout(() => func.apply(this, args), wait);
   };
 }
+
+async function syncLocalToCloud() {
+  const localFiles = importedFiles.filter(f => f.id !== 'db-notes');
+  if (localFiles.length === 0) {
+    alert('当前没有载入本地备份文件，无需同步！');
+    return;
+  }
+
+  let allNotes = [];
+  localFiles.forEach(f => {
+    f.notes.forEach(n => {
+      allNotes.push({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        category: n.category,
+        date: n.date
+      });
+    });
+  });
+
+  if (allNotes.length === 0) return;
+
+  if (!confirm(`检测到您载入了 ${allNotes.length} 篇本地备份便签，是否确认一键将它们全部同步保存到云端数据库中？\n（系统将自动智能查重，已有便签会自动生成时空版本历史，安全无损！）`)) {
+    return;
+  }
+
+  try {
+    const btn = document.getElementById('btn-cloud-sync-action');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = '⏳ 正在极速进行云端同步持久化...';
+    }
+
+    const res = await ApiClient.syncPush(allNotes);
+    alert(`🎉 恭喜！云端同步成功！\n✨ 新增导入: ${res.stats.inserted} 篇\n📝 版本更新: ${res.stats.updated} 篇\n✅ 智能去重略过: ${res.stats.skipped} 篇`);
+    
+    // Switch to cloud DB space and reload
+    activeFileId = 'db-notes';
+    activeCategoryName = '全部便签';
+    window.activeFileId = activeFileId;
+    window.activeCategoryName = activeCategoryName;
+
+    // Clear local imported files to avoid screen duplicate confusion
+    importedFiles = importedFiles.filter(f => f.id === 'db-notes');
+    window.importedFiles = importedFiles;
+
+    await loadNotesFromDB();
+  } catch (err) {
+    alert('云端同步失败: ' + err.message);
+  } finally {
+    const btn = document.getElementById('btn-cloud-sync-action');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '☁️ 一键将导入的本地备份同步持久化至云端数据库';
+    }
+  }
+}
+window.syncLocalToCloud = syncLocalToCloud;
