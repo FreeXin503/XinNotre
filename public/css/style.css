@@ -458,3 +458,97 @@ header {
   background: var(--bg-hover);
   color: var(--text-main);
 }
+
+/* Fullstack Custom Actions Header Alignment */
+.header-right-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-action-outline {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: var(--glass-blur);
+}
+
+.btn-action-outline:hover {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Edit Panel Visual Integrity */
+.note-edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 750px;
+  margin: 0 auto;
+}
+
+.note-edit-container textarea {
+  min-height: 350px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.edit-meta-row {
+  display: flex;
+  gap: 12px;
+}
+
+/* Time Machine UI Styling */
+.version-history-box {
+  margin-top: 40px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  backdrop-filter: var(--glass-blur);
+}
+
+.version-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 13.5px;
+}
+
+.version-item:last-child {
+  border-bottom: none;
+}
+
+/* AI Dialogue Bubble Styling Fixes */
+.thinking-container {
+  background: rgba(255, 255, 255, 0.015);
+  border-left: 2px solid var(--primary);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.thinking-header {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.thinking-body {
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.85;
+  font-style: italic;
+}
