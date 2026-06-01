@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XinAINote - OPPO便签智能可视化与AI对答系统</title>
+    <!-- 引入 Google 字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- 引入第三方依赖库 (CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="notes_data.js"></script>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Auth Modal Overlay -->
+  <div id="auth-overlay" class="auth-overlay" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-title">XinNote 智能云空间</div>
+      <div class="auth-subtitle">全栈升级 v5.0 • 灵感无处不在</div>
+      <div id="auth-error" class="auth-error">用户名或密码错误</div>
+      <form id="auth-form" onsubmit="return false;">
+        <div class="auth-input-group">
+          <label>用户名</label>
+          <input type="text" id="auth-username" class="auth-input" placeholder="输入您的用户名" required autocomplete="username">
+        </div>
+        <div class="auth-input-group" style="margin-bottom: 24px;">
+          <label>密码</label>
+          <input type="password" id="auth-password" class="auth-input" placeholder="输入您的密码" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="btn-auth-submit" class="auth-btn">立即登录</button>
+      </form>
+      <div class="auth-toggle">
+        还没有账号？ <span id="btn-auth-toggle">立即注册</span>
+      </div>
+    </div>
+  </div>
+
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <button id="btn-toggle-sidebar" class="header-icon-btn" title="收起侧边栏">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            <div class="logo">
+                <!-- Sparkle Gradient SVG -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation: pulse 3s infinite ease-in-out;">
+                    <path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-logo-grad)"/>
+                    <defs>
+                        <linearGradient id="gemini-star-logo-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#4285f4"/>
+                            <stop offset="50%" stop-color="#9b72cb"/>
+                            <stop offset="100%" stop-color="#d96570"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                XinAINote <span>OPPO便签智能空间</span>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div id="file-info" style="font-size: 12px; color: var(--text-muted); display: none;">
+                📦 当前已载入备份文件：<strong id="loaded-zip-name" style="color: white; font-weight: 500;">-</strong>
+            </div>
+            <button id="btn-toggle-theme" class="header-icon-btn" title="切换至明亮模式" style="border: 1px solid var(--border-color); width: 36px; height: 36px;">
+                <svg id="theme-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="app-container">
+        <!-- 拖放上传界面 (fixed 全屏遮罩，仅在外部拖入文件时优雅呈现) -->
+        <div id="drop-zone">
+            <div class="drop-icon">⚡</div>
+            <div class="drop-title">释放文件以极速解析本地数据</div>
+            <div class="drop-subtitle">支持拖拽 <strong>oppo_notes_all_data_xxxx.json</strong> 备份，<br>或者备份 .zip 归档包。我们将在本地秒级完成全量渲染！</div>
+            <input type="file" id="file-input" style="display: none;" accept=".zip,.json">
+            <button class="btn-upload" onclick="document.getElementById('file-input').click()">选择本地文件</button>
+        </div>
+
+        <!-- 侧边栏：分类与最近 (Gemini Bar) -->
+        <div class="sidebar">
+            <div class="sidebar-header-toggle" id="sidebar-header-toggle">
+                <span>⚙️ 快捷控制</span>
+                <svg class="section-arrow" id="sidebar-top-controls-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+
+            <div class="sidebar-top-controls" id="sidebar-top-controls">
+                <div class="sidebar-new-chat-box">
+                    <button class="new-chat-btn" id="btn-new-chat">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        发起新对话
+                    </button>
+                </div>
+
+                <!-- 载入本地备份按钮 (完美贴合设计，方便无数据时手动载入) -->
+                <div style="padding: 0 16px 10px 16px;">
+                    <button class="new-chat-btn" onclick="document.getElementById('file-input').click()" style="background: rgba(138, 180, 248, 0.05); border-color: rgba(138, 180, 248, 0.15); color: var(--primary);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        导入备份文件 (JSON/ZIP)
+                    </button>
+                </div>
+                
+                <div class="search-box">
+                    <input type="text" class="search-input" id="search-input" placeholder="🔍 搜便签(全文模糊)...">
+                </div>
+            </div>
+
+            <div class="sidebar-section-title">分类目录</div>
+            <div class="category-list" id="category-list">
+                <!-- 动态渲染分类 -->
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">HP</div>
+                    <div class="sidebar-username-wrapper">
+                        <span class="sidebar-username">Hijau Pandan</span>
+                        <span class="sidebar-user-badge">Pro</span>
+                    </div>
+                </div>
+                <button class="sidebar-settings-btn" title="系统设置">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 中间便签卡片列表 -->
+        <div class="notes-panel">
+            <div class="panel-title">
+                <span>便签列表</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="note-count-badge" class="category-count">0</span>
+                    <button id="btn-close-notes-panel" class="panel-close-btn" title="收起列表">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="notes-list" id="notes-list">
+                <!-- 动态渲染便签卡片 -->
+            </div>
+        </div>
+
+        <!-- 右侧/中央对答正文展示区 -->
+        <div class="reader-panel" id="reader-panel">
+            <!-- 切换导航（Tab） -->
+            <div class="view-tabs" id="view-tabs" style="display: none;">
+                <button id="btn-toggle-notes-panel" class="header-icon-btn" title="收起/展开便签列表" style="margin-right: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                    </svg>
+                </button>
+                <button class="tab-btn active" id="btn-tab-reader">
+                    📖 便签图书馆
+                </button>
+                <button class="tab-btn" id="btn-tab-ai">
+                    ✦ 问答回顾 (Gemini 灵魂对话)
+                </button>
+            </div>
+
+            <!-- 看板视图 (未选便签时展示) -->
+            <div class="dashboard" id="dashboard-view" style="display: flex;">
+                <h2 style="font-family: 'Outfit', sans-serif; font-size: 26px; margin-bottom: 10px; font-weight: 500;">欢迎使用 XinAINote 本地智能空间</h2>
+                <p style="color: var(--text-muted); max-width: 500px; font-size: 13.5px;">请在左侧点击分类并选择一篇便签开始阅读，或在上方切换至“问答回顾”进行 AI 灵魂对话。若无数据，请点击左下角按钮或直接拖拽备份文件至窗口！</p>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-total-notes">0</div>
+                        <div class="stat-label">便签总数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-total-folders">0</div>
+                        <div class="stat-label">分类目录</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" id="stat-total-words">0</div>
+                        <div class="stat-label">总字数估计</div>
+                    </div>
+                </div>
+
+                <!-- 可视化图表大屏 -->
+                <div class="charts-container" id="dashboard-charts" style="display: none;">
+                    <div class="chart-card chart-card-full">
+                        <div class="chart-title">📊 历年字数与发布频次趋势</div>
+                        <div style="position: relative; width: 100%; height: 220px;">
+                            <canvas id="chart-trend"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">🎭 情感色彩与心路走势</div>
+                        <div style="position: relative; width: 100%; height: 220px; display: flex; justify-content: center; align-items: center; width: 100%;">
+                            <canvas id="chart-emotion" style="max-height: 220px; max-width: 220px;"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">📁 便签分类占比分布</div>
+                        <div style="position: relative; width: 100%; height: 220px; display: flex; justify-content: center; align-items: center; width: 100%;">
+                            <canvas id="chart-category" style="max-height: 220px; max-width: 220px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 本地极速打包 ZIP 区 -->
+                <div class="btn-pack-container" id="pack-container" style="display: none;">
+                    <button class="btn-pack" id="btn-pack-action">
+                        <span>📦 一键本地无损打包导出多文件夹 Markdown ZIP 包</span>
+                    </button>
+                    <p style="color: var(--text-muted); font-size: 11px; margin-top: 12px; max-width: 480px; line-height: 1.5;">
+                        * 采用本地纯净环境打包技术，为您在本地将 1600+ 篇便签重组为分目录的 Markdown 文件夹 ZIP，仅需 200 毫秒即可下载完成！
+                    </p>
+                </div>
+            </div>
+
+            <!-- 便签正文阅览视图 -->
+            <div id="reader-view" style="display: none;">
+                <div class="reader-header">
+                    <h1 class="reader-title" id="reader-title">标题</h1>
+                    <div class="reader-meta">
+                        <div>📅 修改时间：<span id="reader-date" style="color: white;">-</span></div>
+                        <div>📁 分类：<span id="reader-folder" class="meta-tag">-</span></div>
+                        <div>✍️ 字数：<span id="reader-words" style="color: white;">-</span> 字</div>
+                    </div>
+                </div>
+                <div class="reader-body-container">
+                    <div class="reader-body markdown-body" id="reader-body">
+                        <!-- Markdown 正文渲染处 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI 灵魂对话视图 (Centered Viewport) -->
+            <div id="ai-chat-view" style="display: none;">
+                <!-- AI 问答对话滚屏 -->
+                <div class="ai-chat-messages-container">
+                    <div id="ai-chat-messages">
+                        <!-- 初始迎宾界面 (居中 650px) -->
+                        <div class="ai-msg-welcome">
+                            <!-- Huge sparkling gemini star -->
+                            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: 20px; animation: pulse 2s infinite ease-in-out;">
+                                <path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-wel-grad)"/>
+                                <defs>
+                                    <linearGradient id="gemini-star-wel-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                                        <stop offset="0%" stop-color="#4285f4"/>
+                                        <stop offset="50%" stop-color="#9b72cb"/>
+                                        <stop offset="100%" stop-color="#d96570"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div>
+                                <span class="gemini-gradient-title">Hijau，需要我帮您做点什么？</span>
+                            </div>
+                            <p style="color: var(--text-muted); font-size: 13.5px; line-height: 1.6; max-width: 520px; margin: 0 auto 24px auto;">
+                                我是你的本地 Gemini 智能助理。我已经深度关联了你从 OPPO 便签中导出的 <strong style="color:var(--primary);" id="ai-note-count">0</strong> 篇历史文本。我们可以立刻开始深度问答，回顾你过去几年的思绪与成长。
+                            </p>
+                            
+                            <!-- 预设快捷卡片 (扁平极简风格) -->
+                            <div class="ai-preset-cards-grid">
+                                <div class="ai-preset-card" onclick="sendAiPreset('📅 总结我过去几年的情感与心路历程，看看我最常有哪些情绪起伏和心理变化？')">
+                                    <div class="preset-title">🎭 情感心路回顾</div>
+                                    <div class="preset-desc">分析我文字中流露的喜怒哀乐与成长变化</div>
+                                </div>
+                                <div class="ai-preset-card" onclick="sendAiPreset('💡 梳理我这些年在技术、学习或事业上的成长轨迹和核心收获。')">
+                                    <div class="preset-title">🚀 事业成长轨迹</div>
+                                    <div class="preset-desc">挖掘我记录的学习心得与工作难关</div>
+                                </div>
+                                <div class="ai-preset-card" onclick="sendAiPreset('🧘‍♂️ 分析我这些年来最常思考的哲学问题、人生困惑以及自我解答。')">
+                                    <div class="preset-title">🔍 哲学自我追问</div>
+                                    <div class="preset-desc">总结我对人生、理想与自我的不断探索</div>
+                                </div>
+                                <div class="ai-preset-card" onclick="sendAiPreset('🌟 找出我便签日记中提到最多次的关键词，并为我构建几个我的人生核心关键词。')">
+                                    <div class="preset-title">✨ 人生词频提炼</div>
+                                    <div class="preset-desc">通过数据做词频分析，刻画人生特征</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 居中药丸胶囊输入区 -->
+                <div class="ai-chat-input-container">
+                    <div class="gemini-pill-bar">
+                        <div class="pill-textarea-wrapper">
+                            <textarea id="ai-chat-input" rows="1" placeholder="问问 Gemini (输入你的心路追问...支持 Shift+Enter 换行)"></textarea>
+                        </div>
+                        
+                        <div class="pill-footer">
+                            <div class="pill-left-accessories">
+                                <div class="pill-scope-selector-btn" title="选择智能检索的文本范围">
+                                    <span>🎯 范围:</span>
+                                    <select id="ai-context-scope">
+                                        <option value="all">🌍 全量便签 (智能关联)</option>
+                                        <option value="current-cat">📁 当前分类 (过滤目录)</option>
+                                        <option value="current-note">📄 当前便签 (聚焦单篇)</option>
+                                    </select>
+                                </div>
+                                <span style="font-size: 11px; color: rgba(255,255,255,0.15);">|</span>
+                                <div class="pill-scope-selector-btn" title="选择 AI 大模型">
+                                    <span>🤖 模型:</span>
+                                    <select id="ai-model-selector">
+                                        <optgroup label="Google Gemini (默认推荐)">
+                                            <option value="gemini-2.5-flash" selected>✦ Gemini 2.5 Flash (极速且强大)</option>
+                                            <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (深度逻辑与推理)</option>
+                                            <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (轻量响应)</option>
+                                            <option value="gemini-1.5-pro">🪐 Gemini 1.5 Pro (经典大上下文)</option>
+                                        </optgroup>
+                                        <optgroup label="DeepSeek">
+                                            <option value="deepseek-chat">✦ DeepSeek-V3 (极速对话)</option>
+                                            <option value="deepseek-reasoner">🧠 DeepSeek-R1 (深度思考)</option>
+                                            <option value="deepseek-v4-flash">⚡ DeepSeek-V4-Flash (超低延迟)</option>
+                                            <option value="deepseek-pro">🪐 DeepSeek-Pro (高阶推理)</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="pill-right-accessories">
+                                <button id="btn-ai-settings" class="pill-send-btn" title="配置 API Key 密钥" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); margin-right: 4px;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                    </svg>
+                                </button>
+                                <button id="btn-export-ai" class="pill-send-btn" title="导出当前对话记录 (Markdown)" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); margin-right: 4px; display: none;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                </button>
+                                <button id="btn-send-ai" class="pill-send-btn" title="发送消息">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ai-chat-disclaimer">Gemini 可能会产生错误信息，请核对重要便签信息。</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- API Settings Modal -->
+    <div id="ai-settings-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+        <div class="settings-modal-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 20px; padding: 28px; width: 100%; max-width: 460px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 18px; color: var(--text-main); font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <span>⚙️ 配置大模型 API 密钥</span>
+                </h3>
+                <button id="btn-close-settings" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 4px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                💡 秘钥将本地存储在您浏览器的 <code>localStorage</code> 中，绝不上传至任何第三方服务器。
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-main);">Google Gemini API Key:</label>
+                    <input type="password" id="input-gemini-key" placeholder="输入 Gemini API Key (以 AIza 或 AQ. 开头)" style="background: var(--bg-base); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 14px; color: white; outline: none; font-size: 13.5px; width: 100%;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-main);">DeepSeek API Key:</label>
+                    <input type="password" id="input-deepseek-key" placeholder="输入 DeepSeek API Key (以 sk- 开头)" style="background: var(--bg-base); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 14px; color: white; outline: none; font-size: 13.5px; width: 100%;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 13px; font-weight: 600; color: var(--text-main);">DeepSeek API Endpoint (自定义 API 接口端点，支持反向代理以解决 CORS 浏览器阻挡):</label>
+                    <input type="text" id="input-deepseek-url" placeholder="https://api.deepseek.com/chat/completions" style="background: var(--bg-base); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 14px; color: white; outline: none; font-size: 13.5px; width: 100%;">
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button id="btn-save-settings" style="background: var(--primary); color: #131314; border: none; border-radius: 10px; padding: 10px 20px; font-weight: 600; cursor: pointer; transition: all 0.2s;">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API 密钥配置 (支持 localStorage 动态读取)
+        let GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY') || "";
+        let DEEPSEEK_API_KEY = localStorage.getItem('DEEPSEEK_API_KEY') || "";
+        let DEEPSEEK_API_URL = localStorage.getItem('DEEPSEEK_API_URL') || "https://api.deepseek.com/chat/completions";
+
+        // 数据池
+        let importedFiles = []; // 多备份文件管理数据库
+        let rawNotes = []; // 汇总打平的所有便签，用于 AI 和 ZIP 导出
+        let aiMessageHistory = []; // AI 对话历史记录
+
+        // DOM 引用
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const categoryList = document.getElementById('category-list');
+        const notesList = document.getElementById('notes-list');
+        const searchInput = document.getElementById('search-input');
+        
+        const readerPanel = document.getElementById('reader-panel');
+        const viewTabs = document.getElementById('view-tabs');
+        const btnTabReader = document.getElementById('btn-tab-reader');
+        const btnTabAi = document.getElementById('btn-tab-ai');
+        
+        const readerView = document.getElementById('reader-view');
+        const dashboardView = document.getElementById('dashboard-view');
+        const aiChatView = document.getElementById('ai-chat-view');
+        const aiChatMessages = document.getElementById('ai-chat-messages');
+        const aiChatInput = document.getElementById('ai-chat-input');
+        const btnSendAi = document.getElementById('btn-send-ai');
+        const btnExportAi = document.getElementById('btn-export-ai');
+        const aiContextScope = document.getElementById('ai-context-scope');
+        
+        const packContainer = document.getElementById('pack-container');
+        const btnPackAction = document.getElementById('btn-pack-action');
+        
+        const statTotalNotes = document.getElementById('stat-total-notes');
+        const statTotalFolders = document.getElementById('stat-total-folders');
+        const statTotalWords = document.getElementById('stat-total-words');
+
+        // 折叠控制相关 DOM 引用
+        const sidebar = document.querySelector('.sidebar');
+        const notesPanel = document.querySelector('.notes-panel');
+        const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+        const btnToggleNotesPanel = document.getElementById('btn-toggle-notes-panel');
+        const btnCloseNotesPanel = document.getElementById('btn-close-notes-panel');
+        const aiModelSelector = document.getElementById('ai-model-selector');
+
+        // 侧边栏折叠偏好数据载入与事件绑定
+        let leftSidebarCollapsed = localStorage.getItem('leftSidebarCollapsed') === 'true';
+        let notesPanelCollapsed = localStorage.getItem('notesPanelCollapsed') === 'true';
+
+        // 初始化折叠状态
+        function initSidebarCollapseStates() {
+            if (leftSidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+                if (btnToggleSidebar) {
+                    btnToggleSidebar.classList.add('active-collapsed');
+                    btnToggleSidebar.title = '展开侧边栏';
+                }
+            } else {
+                sidebar.classList.remove('collapsed');
+                if (btnToggleSidebar) {
+                    btnToggleSidebar.classList.remove('active-collapsed');
+                    btnToggleSidebar.title = '收起侧边栏';
+                }
+            }
+
+            if (notesPanelCollapsed) {
+                notesPanel.classList.add('collapsed');
+                if (btnToggleNotesPanel) {
+                    btnToggleNotesPanel.classList.add('active-collapsed');
+                    btnToggleNotesPanel.title = '展开便签列表';
+                }
+            } else {
+                notesPanel.classList.remove('collapsed');
+                if (btnToggleNotesPanel) {
+                    btnToggleNotesPanel.classList.remove('active-collapsed');
+                    btnToggleNotesPanel.title = '收起便签列表';
+                }
+            }
+        }
+        initSidebarCollapseStates();
+
+        // 主题切换控制与持久化引擎
+        const btnToggleTheme = document.getElementById('btn-toggle-theme');
+        const themeIcon = document.getElementById('theme-icon');
+        let currentTheme = localStorage.getItem('theme') || 'dark';
+
+        function initTheme() {
+            if (currentTheme === 'light') {
+                document.body.classList.add('light-theme');
+                if (btnToggleTheme) btnToggleTheme.title = '切换至暗黑模式';
+                if (themeIcon) {
+                    themeIcon.innerHTML = `
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    `; // Sun icon
+                }
+            } else {
+                document.body.classList.remove('light-theme');
+                if (btnToggleTheme) btnToggleTheme.title = '切换至明亮模式';
+                if (themeIcon) {
+                    themeIcon.innerHTML = `
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    `; // Moon icon
+                }
+            }
+        }
+        initTheme();
+
+        if (btnToggleTheme) {
+            btnToggleTheme.addEventListener('click', () => {
+                currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', currentTheme);
+                initTheme();
+                
+                // 重新渲染统计图表以适配主题色彩配置
+                if (window.renderChartsWithData) {
+                    window.renderChartsWithData();
+                }
+            });
+        }
+
+        // 绑定折叠按钮事件监听器
+        if (btnToggleSidebar) {
+            btnToggleSidebar.addEventListener('click', () => {
+                leftSidebarCollapsed = !leftSidebarCollapsed;
+                sidebar.classList.toggle('collapsed', leftSidebarCollapsed);
+                btnToggleSidebar.classList.toggle('active-collapsed', leftSidebarCollapsed);
+                btnToggleSidebar.title = leftSidebarCollapsed ? '展开侧边栏' : '收起侧边栏';
+                localStorage.setItem('leftSidebarCollapsed', leftSidebarCollapsed);
+            });
+        }
+
+        function toggleNotesPanel(forceState) {
+            if (forceState !== undefined) {
+                notesPanelCollapsed = forceState;
+            } else {
+                notesPanelCollapsed = !notesPanelCollapsed;
+            }
+            notesPanel.classList.toggle('collapsed', notesPanelCollapsed);
+            btnToggleNotesPanel.classList.toggle('active-collapsed', notesPanelCollapsed);
+            btnToggleNotesPanel.title = notesPanelCollapsed ? '展开便签列表' : '收起便签列表';
+            localStorage.setItem('notesPanelCollapsed', notesPanelCollapsed);
+        }
+
+        if (btnToggleNotesPanel) {
+            btnToggleNotesPanel.addEventListener('click', () => toggleNotesPanel());
+        }
+
+        if (btnCloseNotesPanel) {
+            btnCloseNotesPanel.addEventListener('click', () => toggleNotesPanel(true));
+        }
+
+        // 侧边栏顶部工具栏折叠偏好
+        const sidebarHeaderToggle = document.getElementById('sidebar-header-toggle');
+        const sidebarTopControls = document.getElementById('sidebar-top-controls');
+        const sidebarTopControlsArrow = document.getElementById('sidebar-top-controls-arrow');
+        let topControlsCollapsed = localStorage.getItem('topControlsCollapsed') === 'true';
+
+        function initTopControlsState() {
+            if (sidebarTopControls && sidebarTopControlsArrow) {
+                if (topControlsCollapsed) {
+                    sidebarTopControls.classList.add('collapsed');
+                    sidebarTopControlsArrow.classList.add('collapsed');
+                } else {
+                    sidebarTopControls.classList.remove('collapsed');
+                    sidebarTopControlsArrow.classList.remove('collapsed');
+                }
+            }
+        }
+        initTopControlsState();
+
+        if (sidebarHeaderToggle) {
+            sidebarHeaderToggle.addEventListener('click', () => {
+                topControlsCollapsed = !topControlsCollapsed;
+                if (sidebarTopControls && sidebarTopControlsArrow) {
+                    sidebarTopControls.classList.toggle('collapsed', topControlsCollapsed);
+                    sidebarTopControlsArrow.classList.toggle('collapsed', topControlsCollapsed);
+                }
+                localStorage.setItem('topControlsCollapsed', topControlsCollapsed);
+            });
+        }
+
+        // ==================== 🛠️ 多备份文件与大目录管理逻辑 ====================
+        let activeFileId = null;
+        let activeCategoryName = null;
+
+        // 重组打平的全局 rawNotes
+        function rebuildFlatRawNotes() {
+            rawNotes = [];
+            importedFiles.forEach(f => {
+                rawNotes.push(...f.notes);
+            });
+        }
+
+        // 统一装配载入新备份文件
+        function addImportedFile(fileName, list) {
+            // 防止重复导入同一个文件名
+            const isExist = importedFiles.some(f => f.name === fileName);
+            const actualName = isExist ? `${fileName}_(${Math.random().toString(36).substring(2, 5)})` : fileName;
+
+            const fileId = 'file-' + Math.random().toString(36).substring(2, 9);
+            const notes = [];
+            const fileCategories = { '全部便签': [] };
+            let totalWords = 0;
+
+            list.forEach(item => {
+                const title = item.title || '无标题';
+                const time = item.time || '';
+                const category = item.category || '未分类';
+                const content = item.content || item.contentText || '';
+                const wordCount = content.length;
+                totalWords += wordCount;
+
+                const noteObj = {
+                    id: item.id || Math.random().toString(36).substring(2),
+                    title: title,
+                    date: time,
+                    category: category,
+                    content: content,
+                    wordCount: wordCount,
+                    fileId: fileId
+                };
+
+                notes.push(noteObj);
+                fileCategories['全部便签'].push(noteObj);
+
+                if (!fileCategories[category]) {
+                    fileCategories[category] = [];
+                }
+                fileCategories[category].push(noteObj);
+            });
+
+            const newFileObj = {
+                id: fileId,
+                name: actualName,
+                notes: notes,
+                categories: fileCategories,
+                wordCount: totalWords,
+                collapsed: false
+            };
+
+            importedFiles.push(newFileObj);
+            updateGlobalDataAndUI();
+            
+            // 默认选定刚导入的文件
+            selectFileCategory(fileId, '全部便签');
+        }
+
+        // 一键卸载本地备份文件
+        window.removeImportedFile = function(fileId) {
+            if (confirm('确定要卸载此文件吗？卸载后本地数据将从内存中移除。')) {
+                importedFiles = importedFiles.filter(f => f.id !== fileId);
+                
+                if (importedFiles.length > 0) {
+                    if (activeFileId === fileId) {
+                        selectFileCategory(importedFiles[0].id, '全部便签');
+                    } else {
+                        updateGlobalDataAndUI();
+                    }
+                } else {
+                    activeFileId = null;
+                    activeCategoryName = null;
+                    rawNotes = [];
+                    notesList.innerHTML = '<div style="color: var(--text-muted); text-align: center; margin-top: 30px; font-size: 14px;">请在左侧或通过拖拽导入备份文件</div>';
+                    document.getElementById('note-count-badge').textContent = '0';
+                    
+                    dashboardView.style.display = 'flex';
+                    readerView.style.display = 'none';
+                    aiChatView.style.display = 'none';
+                    
+                    updateGlobalDataAndUI();
+                }
+            }
+        };
+
+        // 统一更新全局计算变量和 UI 指标
+        function updateGlobalDataAndUI() {
+            rebuildFlatRawNotes();
+
+            statTotalNotes.textContent = rawNotes.length;
+            
+            let folderSet = new Set();
+            let totalWords = 0;
+            importedFiles.forEach(f => {
+                totalWords += f.wordCount;
+                Object.keys(f.categories).forEach(cat => {
+                    if (cat !== '全部便签') {
+                        folderSet.add(f.id + '::' + cat);
+                    }
+                });
+            });
+            statTotalFolders.textContent = folderSet.size;
+            statTotalWords.textContent = formatWordCount(totalWords);
+
+            // 更新页顶载入状态
+            const statusInfo = document.getElementById('loaded-zip-name');
+            if (statusInfo) {
+                if (importedFiles.length > 0) {
+                    document.getElementById('file-info').style.display = 'block';
+                    statusInfo.innerHTML = `已自动载入 <strong>${importedFiles.length}</strong> 个备份文件，共 <strong>${rawNotes.length}</strong> 条便签！`;
+                } else {
+                    document.getElementById('file-info').style.display = 'none';
+                }
+            }
+
+            const aiNoteCount = document.getElementById('ai-note-count');
+            if (aiNoteCount) aiNoteCount.textContent = rawNotes.length;
+
+            renderCategoriesTree();
+
+            packContainer.style.display = importedFiles.length > 0 ? 'block' : 'none';
+            viewTabs.style.display = importedFiles.length > 0 ? 'flex' : 'none';
+
+            const chartsContainer = document.getElementById('dashboard-charts');
+            if (chartsContainer) {
+                if (importedFiles.length > 0) {
+                    chartsContainer.style.display = 'grid';
+                    setTimeout(() => {
+                        window.renderChartsWithData();
+                    }, 50);
+                } else {
+                    chartsContainer.style.display = 'none';
+                }
+            }
+        }
+
+        // ==================== 📊 智能数据驾驶舱（统计与情感分析图表渲染引擎） ====================
+        window.renderChartsWithData = function() {
+            if (rawNotes.length === 0) return;
+
+            const isLight = document.body.classList.contains('light-theme');
+            const gridColor = isLight ? '#e0e3e7' : '#2e2f30';
+            const textColor = isLight ? '#5f6368' : '#9e9e9e';
+            const primaryColor = isLight ? '#1a73e8' : '#8ab4f8';
+            const accentColor = isLight ? '#e0605a' : '#d96570';
+            const chartColors = isLight 
+                ? ['#1a73e8', '#1e8e3e', '#f9ab00', '#7c4dff', '#e0605a', '#17a2b8']
+                : ['#8ab4f8', '#34a853', '#f59e0b', '#9b72cb', '#d96570', '#17a2b8'];
+
+            // 1. 数据准备：历年发布趋势（按月份归集）
+            const monthlyData = {};
+            rawNotes.forEach(note => {
+                if (!note.date || note.date === '-') return;
+                const month = note.date.substring(0, 7); // "YYYY-MM"
+                if (month && month.match(/^\d{4}-\d{2}$/)) {
+                    if (!monthlyData[month]) {
+                        monthlyData[month] = { count: 0, words: 0 };
+                    }
+                    monthlyData[month].count += 1;
+                    monthlyData[month].words += note.wordCount || 0;
+                }
+            });
+
+            // 排序月份
+            const sortedMonths = Object.keys(monthlyData).sort();
+            // 如果月份太多，仅展示最近的 18 个月以防拥挤
+            const displayMonths = sortedMonths.slice(-18);
+            const counts = displayMonths.map(m => monthlyData[m].count);
+            const words = displayMonths.map(m => monthlyData[m].words);
+
+            // 2. 数据准备：情感心路走势（本地情感扫描）
+            let peacefulCount = 0;
+            let joyCount = 0;
+            let anxiousCount = 0;
+            let techCount = 0;
+
+            const emoPeaceful = ['平静', '宁静', '哲学', '思考', '觉得', '意义', '自然', '温柔', '深夜', '日记'];
+            const emoJoy = ['顺利', '开心', '进步', '喜欢', '希望', '信心', '加油', '欢喜', '幸福', '喜悦'];
+            const emoAnxious = ['焦虑', '迷茫', '累', '疲惫', '痛苦', '难受', '怎么办', '烦躁', '压力', '伤心'];
+            const emoTech = ['代码', '技术', '学习', '开发', 'bug', '解决', '程序', '收获', '积累', '坚持'];
+
+            rawNotes.forEach(note => {
+                const text = ((note.title || '') + ' ' + (note.content || '')).toLowerCase();
+                emoPeaceful.forEach(w => { if (text.includes(w)) peacefulCount++; });
+                emoJoy.forEach(w => { if (text.includes(w)) joyCount++; });
+                emoAnxious.forEach(w => { if (text.includes(w)) anxiousCount++; });
+                emoTech.forEach(w => { if (text.includes(w)) techCount++; });
+            });
+
+            const totalEmo = (peacefulCount + joyCount + anxiousCount + techCount) || 1;
+            const emoData = [
+                Math.round((peacefulCount / totalEmo) * 100),
+                Math.round((joyCount / totalEmo) * 100),
+                Math.round((anxiousCount / totalEmo) * 100),
+                Math.round((techCount / totalEmo) * 100)
+            ];
+
+            // 3. 数据准备：便签分类占比
+            const categorySummary = {};
+            rawNotes.forEach(note => {
+                const cat = note.category || '未分类';
+                categorySummary[cat] = (categorySummary[cat] || 0) + 1;
+            });
+
+            const sortedCategories = Object.keys(categorySummary).sort((a,b) => categorySummary[b] - categorySummary[a]);
+            const topCategories = sortedCategories.slice(0, 5);
+            let otherCount = 0;
+            sortedCategories.slice(5).forEach(c => {
+                otherCount += categorySummary[c];
+            });
+
+            const catLabels = [...topCategories];
+            const catData = topCategories.map(c => categorySummary[c]);
+            if (otherCount > 0) {
+                catLabels.push('其他分类');
+                catData.push(otherCount);
+            }
+
+            // ------------------ 渲染 Chart 1: 历年字数与发布频次 ------------------
+            if (window.statsChartInstance1) window.statsChartInstance1.destroy();
+            const ctx1 = document.getElementById('chart-trend')?.getContext('2d');
+            if (ctx1) {
+                window.statsChartInstance1 = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: displayMonths,
+                        datasets: [
+                            {
+                                label: '字数统计',
+                                type: 'line',
+                                data: words,
+                                borderColor: primaryColor,
+                                borderWidth: 2,
+                                backgroundColor: 'transparent',
+                                tension: 0.3,
+                                yAxisID: 'y-words'
+                            },
+                            {
+                                label: '便签数量 (篇)',
+                                data: counts,
+                                backgroundColor: isLight ? 'rgba(26, 115, 232, 0.15)' : 'rgba(138, 180, 248, 0.15)',
+                                borderColor: isLight ? 'rgba(26, 115, 232, 0.4)' : 'rgba(138, 180, 248, 0.4)',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                yAxisID: 'y-count'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { labels: { color: textColor, font: { size: 10 } } },
+                            tooltip: { padding: 10, cornerRadius: 8 }
+                        },
+                        scales: {
+                            x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } },
+                            'y-count': {
+                                type: 'linear',
+                                position: 'left',
+                                grid: { color: gridColor },
+                                ticks: { color: textColor, font: { size: 10 } },
+                                title: { display: true, text: '发布频次 (篇)', color: textColor, font: { size: 10 } }
+                            },
+                            'y-words': {
+                                type: 'linear',
+                                position: 'right',
+                                grid: { drawOnChartArea: false },
+                                ticks: { color: textColor, font: { size: 10 } },
+                                title: { display: true, text: '记录字数 (字)', color: textColor, font: { size: 10 } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ------------------ 渲染 Chart 2: 情感雷达图 ------------------
+            if (window.statsChartInstance2) window.statsChartInstance2.destroy();
+            const ctx2 = document.getElementById('chart-emotion')?.getContext('2d');
+            if (ctx2) {
+                window.statsChartInstance2 = new Chart(ctx2, {
+                    type: 'radar',
+                    data: {
+                        labels: ['🧘‍♂️ 平静深思', '✨ 笃定喜悦', '🎭 迷茫焦虑', '🚀 奋斗成长'],
+                        datasets: [{
+                            label: '心路走势占比 (%)',
+                            data: emoData,
+                            backgroundColor: isLight ? 'rgba(124, 77, 255, 0.1)' : 'rgba(155, 114, 203, 0.15)',
+                            borderColor: isLight ? '#7c4dff' : '#9b72cb',
+                            borderWidth: 2,
+                            pointBackgroundColor: isLight ? '#7c4dff' : '#9b72cb',
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { cornerRadius: 8 }
+                        },
+                        scales: {
+                            r: {
+                                grid: { color: gridColor },
+                                angleLines: { color: gridColor },
+                                pointLabels: { color: textColor, font: { size: 11, weight: '500' } },
+                                ticks: { display: false, stepSize: 20 },
+                                min: 0
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ------------------ 渲染 Chart 3: 分类占比饼图 ------------------
+            if (window.statsChartInstance3) window.statsChartInstance3.destroy();
+            const ctx3 = document.getElementById('chart-category')?.getContext('2d');
+            if (ctx3) {
+                window.statsChartInstance3 = new Chart(ctx3, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{
+                            data: catData,
+                            backgroundColor: chartColors,
+                            borderWidth: isLight ? 1 : 0,
+                            borderColor: gridColor
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { color: textColor, font: { size: 10 }, boxWidth: 12 }
+                            },
+                            tooltip: { cornerRadius: 8 }
+                        },
+                        cutout: '65%'
+                    }
+                });
+            }
+        };
+
+        // 选择并激活文件之分类
+        function selectFileCategory(fileId, catName) {
+            activeFileId = fileId;
+            activeCategoryName = catName;
+
+            renderCategoriesTree();
+
+            const file = importedFiles.find(f => f.id === fileId);
+            if (file) {
+                const notes = file.categories[catName] || [];
+                renderNotesList(notes);
+            }
+        }
+
+        // 渲染多文件折叠树状分类列表
+        function renderCategoriesTree() {
+            categoryList.innerHTML = '';
+
+            if (importedFiles.length === 0) {
+                categoryList.innerHTML = '<div style="color: var(--text-muted); text-align: center; margin-top: 20px; font-size: 12px; padding: 10px;">暂无导入的数据，请在上方导入备份</div>';
+                return;
+            }
+
+            importedFiles.forEach(file => {
+                const fileGroup = document.createElement('div');
+                fileGroup.className = 'file-group';
+                fileGroup.id = `file-group-${file.id}`;
+
+                const header = document.createElement('div');
+                header.className = 'file-group-header';
+                
+                const arrowSvg = `
+                    <svg class="file-group-arrow ${file.collapsed ? 'collapsed' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                `;
+
+                header.innerHTML = `
+                    <div class="file-group-header-left" title="${file.name}">
+                        <span class="file-group-arrow-wrapper">${arrowSvg}</span>
+                        <span>📦</span>
+                        <span class="file-group-name">${file.name}</span>
+                    </div>
+                    <div class="file-group-header-right">
+                        <span class="category-count">${file.notes.length}</span>
+                        <button class="file-group-delete-btn" title="卸载此文件" onclick="event.stopPropagation(); removeImportedFile('${file.id}')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+
+                header.onclick = () => {
+                    file.collapsed = !file.collapsed;
+                    renderCategoriesTree();
+                };
+
+                fileGroup.appendChild(header);
+
+                const categoriesContainer = document.createElement('div');
+                categoriesContainer.className = `file-group-categories ${file.collapsed ? 'collapsed' : ''}`;
+
+                // 🏷️ 全部便签
+                const allItem = document.createElement('div');
+                allItem.className = `category-item ${activeFileId === file.id && activeCategoryName === '全部便签' ? 'active' : ''}`;
+                allItem.innerHTML = `
+                    <span>🏷️ 全部便签</span>
+                    <span class="category-count">${file.categories['全部便签'].length}</span>
+                `;
+                allItem.onclick = (e) => {
+                    e.stopPropagation();
+                    selectFileCategory(file.id, '全部便签');
+                };
+                categoriesContainer.appendChild(allItem);
+
+                // 各分类子目录
+                Object.keys(file.categories).forEach(catName => {
+                    if (catName === '全部便签') return;
+
+                    const item = document.createElement('div');
+                    item.className = `category-item ${activeFileId === file.id && activeCategoryName === catName ? 'active' : ''}`;
+                    item.innerHTML = `
+                        <span>📁 ${catName}</span>
+                        <span class="category-count">${file.categories[catName].length}</span>
+                    `;
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        selectFileCategory(file.id, catName);
+                    };
+                    categoriesContainer.appendChild(item);
+                });
+
+                fileGroup.appendChild(categoriesContainer);
+                categoryList.appendChild(fileGroup);
+            });
+        }
+
+        // 当前视图状态变量
+        let currentTab = 'reader'; // 'reader' 或 'ai'
+        let currentSelectedNote = null; // 当前选中的便签对象
+
+        // 1. 拖放解析器逻辑 - 全局拖拽文件进入时浮现覆盖层，丢下或离开则关闭
+        let dragCounter = 0;
+        window.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            dropZone.style.display = 'flex';
+        });
+
+        window.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        window.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter <= 0) {
+                dropZone.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropZone.style.display = 'none';
+            const file = e.dataTransfer.files[0];
+            if (file) handleIncomingFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleIncomingFile(file);
+        });
+
+        function handleIncomingFile(file) {
+            if (file.name.endsWith('.json')) {
+                parseJson(file);
+            } else if (file.name.endsWith('.zip')) {
+                parseZip(file);
+            } else {
+                alert('请导入有效的 .json 或 .zip 格式备份文件！');
+            }
+        }
+
+        // A. 🌟【极速解析 JSON 备份包】 (0.1秒秒级解包渲染)
+        function parseJson(file) {
+            document.querySelector('.drop-title').textContent = '正在极速载入本地 JSON 数据库...';
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const list = JSON.parse(e.target.result);
+                    if (!Array.isArray(list)) throw new Error('数据结构不正确，应为便签数组');
+
+                    addImportedFile(file.name, list);
+
+                } catch (err) {
+                    alert(`JSON 数据载入解析失败，请确保导入了正确的 oppo_notes_all_data.json 备份文件！\n详情: ${err.message}`);
+                    location.reload();
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // B. 解析以前导出的 ZIP 包 (备用方案)
+        async function parseZip(file) {
+            try {
+                document.querySelector('.drop-title').textContent = '正在分析解压本地 ZIP 归档包...';
+                
+                const loadedZip = await JSZip.loadAsync(file);
+                const list = [];
+
+                for (const relativePath in loadedZip.files) {
+                    const zipEntry = loadedZip.files[relativePath];
+                    
+                    if (!zipEntry.dir && relativePath.endsWith('.md')) {
+                        const content = await zipEntry.async('string');
+                        const parts = relativePath.split('/');
+                        let category = '未分类';
+                        let filename = parts[parts.length - 1];
+
+                        if (parts.length > 1) {
+                            category = parts[parts.length - 2];
+                        }
+
+                        let title = filename.replace('.md', '');
+                        let date = '-';
+                        let markdownBody = content;
+
+                        if (content.startsWith('---')) {
+                            const endOfFrontmatter = content.indexOf('---', 3);
+                            if (endOfFrontmatter !== -1) {
+                                const frontmatterStr = content.substring(3, endOfFrontmatter);
+                                markdownBody = content.substring(endOfFrontmatter + 3).trim();
+                                
+                                const lines = frontmatterStr.split('\n');
+                                lines.forEach(line => {
+                                    const colonIdx = line.indexOf(':');
+                                    if (colonIdx !== -1) {
+                                        const key = line.substring(0, colonIdx).trim().toLowerCase();
+                                        const value = line.substring(colonIdx + 1).trim();
+                                        if (key === 'title') title = value;
+                                        if (key === 'date') date = value;
+                                        if (key === 'category') category = value;
+                                    }
+                                });
+                            }
+                        }
+
+                        if (title.match(/^\d{4}_\d{2}_\d{2}/)) {
+                            title = title.replace(/^\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}_/, '');
+                        }
+
+                        list.push({
+                            title: title,
+                            time: date,
+                            category: category,
+                            content: markdownBody
+                        });
+                    }
+                }
+
+                addImportedFile(file.name, list);
+
+            } catch (error) {
+                alert(`解包失败: ${error.message}`);
+                location.reload();
+            }
+        }
+
+        function formatWordCount(num) {
+            if (num > 10000) {
+                return (num / 10000).toFixed(1) + ' 万';
+            }
+            return num;
+        }
+
+        // 3. 渲染便签卡片列表
+        function renderNotesList(notesArray) {
+            notesList.innerHTML = '';
+            document.getElementById('note-count-badge').textContent = notesArray.length;
+
+            if (notesArray.length === 0) {
+                notesList.innerHTML = '<div style="color: var(--text-muted); text-align: center; margin-top: 30px; font-size: 14px;">此分类下无任何便签</div>';
+                return;
+            }
+
+            notesArray.forEach(note => {
+                const card = document.createElement('div');
+                card.className = 'note-card';
+                card.id = `note-${note.id}`;
+                card.innerHTML = `
+                    <div class="card-title">${note.title || '无标题'}</div>
+                    <div class="card-meta">
+                        <span>📅 ${note.date.substring(0, 10)}</span>
+                        <span>✍️ ${note.wordCount} 字</span>
+                    </div>
+                `;
+                card.onclick = () => selectNote(note);
+                notesList.appendChild(card);
+            });
+        }
+
+        // 选择并阅读便签
+        function selectNote(note) {
+            currentSelectedNote = note; // 记录当前选中的便签，用于 AI 上下文
+
+            document.querySelectorAll('.note-card').forEach(el => el.classList.remove('active'));
+            const cardEl = document.getElementById(`note-${note.id}`);
+            if (cardEl) cardEl.classList.add('active');
+
+            // 无论当前在哪个 tab，只要点击了便签卡片，如果不是 AI 对话模式，就切换回阅读面板
+            if (currentTab !== 'ai') {
+                dashboardView.style.display = 'none';
+                readerView.style.display = 'flex';
+                aiChatView.style.display = 'none';
+            } else {
+                // 如果当前正在 AI 对话，且上下文选择的是“当前便签”，当用户更换便签时给用户提示
+                if (aiContextScope.value === 'current-note') {
+                    addSystemMessage(`已自动将对话焦点切换至当前新选择的便签：《${note.title}》`);
+                }
+            }
+
+            document.getElementById('reader-title').textContent = note.title || '无标题';
+            document.getElementById('reader-date').textContent = note.date;
+            document.getElementById('reader-folder').textContent = note.category;
+            document.getElementById('reader-words').textContent = note.wordCount;
+
+            document.getElementById('reader-body').innerHTML = marked.parse(note.content);
+            document.getElementById('reader-body').scrollTop = 0;
+        }
+
+        // 4. 模糊搜索逻辑
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const file = importedFiles.find(f => f.id === activeFileId);
+            if (!file) return;
+
+            const baseNotes = file.categories[activeCategoryName] || [];
+
+            if (!query) {
+                renderNotesList(baseNotes);
+                return;
+            }
+
+            const matched = baseNotes.filter(note => {
+                return note.title.toLowerCase().includes(query) || 
+                       note.content.toLowerCase().includes(query) ||
+                       note.category.toLowerCase().includes(query);
+            });
+
+            renderNotesList(matched);
+        });
+
+        // 🌟🌟 5. 【终极黑科技】本地超高速 ZIP 无损打包导出
+        btnPackAction.addEventListener('click', async () => {
+            if (rawNotes.length === 0) return;
+
+            btnPackAction.style.background = '#15803d';
+            btnPackAction.innerText = '⏳ 正在进行本地极速无损合并中...';
+
+            // 稍微延迟让 UI 变化
+            await new Promise(r => setTimeout(r, 50));
+
+            try {
+                const exportZip = new JSZip();
+
+                rawNotes.forEach(note => {
+                    // NTFS 文件名安全过滤
+                    const safeTitle = note.title.replace(/[\\\/:\*\?"<>\|]/g, '_').substring(0, 35);
+                    const safeTime = note.date.replace(/[:\-\s\/]/g, '_');
+                    const filename = `${safeTime}_${safeTitle}`;
+                    const catFolder = note.category.replace(/[\\\/:\*\?"<>\|]/g, '_');
+
+                    const mdContent = `---\ntitle: ${note.title}\ndate: ${note.date}\ncategory: ${note.category}\n---\n\n${note.content}`;
+                    
+                    // 构建目录
+                    exportZip.folder(catFolder).file(`${filename}.md`, mdContent);
+                });
+
+                // 本地无损极速封包 (200 毫秒以内完成 1600+ 文件拼接！)
+                const blob = await exportZip.generateAsync({ 
+                    type: 'blob',
+                    compression: 'STORE' 
+                });
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `OPPO云便签_本地无损精美Markdown分类包_${new Date().toISOString().slice(0, 10)}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                btnPackAction.style.background = 'var(--success)';
+                btnPackAction.innerHTML = '✅ 打包下载大获成功！仅耗时约 150 毫秒！';
+
+                setTimeout(() => {
+                    btnPackAction.style.background = 'linear-gradient(135deg, var(--success), #16a34a)';
+                    btnPackAction.innerText = '📦 一键本地无损打包导出多文件夹 Markdown ZIP 包';
+                }, 4000);
+
+            } catch (err) {
+                alert(`本地打包失败: ${err.message}`);
+                btnPackAction.style.background = 'var(--primary)';
+                btnPackAction.innerText = '❌ 打包失败，请重试';
+            }
+        });
+
+        // 🌟🌟 6. 【黑科技】自动检测预装载的 notes_data.js 数据 (免上传/免拖拽)
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.OPPO_NOTES_DATA && Array.isArray(window.OPPO_NOTES_DATA)) {
+                console.log('检测到本地预装载数据，正在自动载入...');
+                addImportedFile('notes_data.js (本地自动预装载)', window.OPPO_NOTES_DATA);
+            }
+        });
+
+        // ==================== 🌟🌟 7. AI 灵魂对话与 DeepSeek API 核心逻辑 ====================
+
+        // A. Tab 切换控制器 (带中间自适应折叠/展开逻辑)
+        btnTabReader.addEventListener('click', () => {
+            currentTab = 'reader';
+            btnTabReader.classList.add('active');
+            btnTabAi.classList.remove('active');
+            
+            // 显示折叠图标按钮
+            if (btnToggleNotesPanel) btnToggleNotesPanel.style.display = 'flex';
+            
+            // 恢复三栏布局并尊重先前的折叠偏好
+            if (notesPanel) {
+                notesPanel.style.display = 'flex';
+                notesPanel.classList.toggle('collapsed', notesPanelCollapsed);
+            }
+            
+            if (currentSelectedNote) {
+                readerView.style.display = 'flex';
+                dashboardView.style.display = 'none';
+            } else {
+                readerView.style.display = 'none';
+                dashboardView.style.display = 'flex';
+            }
+            aiChatView.style.display = 'none';
+        });
+
+        btnTabAi.addEventListener('click', () => {
+            currentTab = 'ai';
+            btnTabAi.classList.add('active');
+            btnTabReader.classList.remove('active');
+            
+            // 隐藏折叠图标按钮
+            if (btnToggleNotesPanel) btnToggleNotesPanel.style.display = 'none';
+            
+            // 对答放在中间：隐藏便签卡片列表面板，实现宽屏聚焦
+            if (notesPanel) notesPanel.style.display = 'none';
+            
+            readerView.style.display = 'none';
+            dashboardView.style.display = 'none';
+            aiChatView.style.display = 'flex';
+            
+            // 自动聚焦输入框
+            aiChatInput.focus();
+        });
+
+        // B. 本地混合检索引擎 (Local RAG Search Engine) - NLP 中文分词与同义词联想优化版
+        function findRelevantNotesLocal(query, maxResults = 12) {
+            if (!query) return [];
+
+            const queryLower = query.toLowerCase();
+
+            // 1. 中文停用词过滤 (Stop-words)
+            const stopWords = new Set(['的', '了', '在', '是', '我', '你', '他', '和', '也', '有', '就', '都', '而', '及', '与', '这', '那', '着', '吧', '吗', '呢']);
+
+            // 2. 滑动 N-gram 分词机制
+            let kws = [];
+            // A. 正则英文与标点分词
+            const cleanQuery = queryLower.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?\u3002\uff0c\u3001\uff1f\uff01\uff1a\u201c\u201d\u3010\u3011\uff08\uff09]/g, " ");
+            const words = cleanQuery.split(/\s+/).filter(w => w.length > 0);
+            
+            words.forEach(word => {
+                if (word.match(/^[a-z0-9]+$/i)) {
+                    if (word.length > 1) kws.push(word);
+                } else {
+                    // 对中文字符进行 N-gram 切分 (2-gram & 3-gram Sliding Window)
+                    const chars = word.split('');
+                    for (let i = 0; i < chars.length; i++) {
+                        // 1-gram
+                        const single = chars[i];
+                        if (!stopWords.has(single)) kws.push(single);
+                        
+                        // 2-gram
+                        if (i < chars.length - 1) {
+                            kws.push(chars[i] + chars[i+1]);
+                        }
+                        // 3-gram
+                        if (i < chars.length - 2) {
+                            kws.push(chars[i] + chars[i+1] + chars[i+2]);
+                        }
+                    }
+                }
+            });
+
+            // 3. 情绪、生活、技术同义词联想词库 (Synonym Association)
+            const synonymDict = [
+                { keys: ['焦虑', '压力', '迷茫', '累', '疲惫', '痛苦', '难受', '烦躁', '低落', '无助'], assoc: '焦虑 压力 迷茫 累 疲惫 痛苦 难受 烦躁 低落 无助' },
+                { keys: ['高兴', '开心', '喜悦', '兴奋', '顺利', '希望', '幸福', '欢喜', '喜欢'], assoc: '高兴 开心 喜悦 兴奋 顺利 希望 幸福 欢喜 喜欢' },
+                { keys: ['平静', '宁静', '安详', '独处', '思考', '哲学', '深夜', '日记'], assoc: '平静 宁静 安详 独处 思考 哲学 深夜 日记' },
+                { keys: ['代码', '技术', '学习', '开发', 'bug', '程序员', '解决', '程序', '算法'], assoc: '代码 技术 学习 开发 bug 程序员 解决 程序 算法' },
+                { keys: ['旅行', '旅游', '出发', '风景', '假期', '拍照', '户外', '爬山'], assoc: '旅行 旅游 出发 风景 假期 拍照 户外 爬山' }
+            ];
+
+            // 自动注入联想到的同义关键词汇
+            const associatedKeywords = new Set();
+            kws.forEach(kw => {
+                synonymDict.forEach(group => {
+                    if (group.keys.includes(kw)) {
+                        group.keys.forEach(k => associatedKeywords.add(k));
+                    }
+                });
+            });
+
+            // 合并原有分词与联想分词，并去重
+            const finalKws = Array.from(new Set([...kws, ...associatedKeywords]));
+
+            if (finalKws.length === 0) return rawNotes.slice(0, maxResults);
+
+            const scored = rawNotes.map(note => {
+                let score = 0;
+                const titleLower = (note.title || '').toLowerCase();
+                const contentLower = (note.content || '').toLowerCase();
+
+                finalKws.forEach(kw => {
+                    // 标题匹配赋予极高权重
+                    if (titleLower.includes(kw)) {
+                        score += 30;
+                    }
+                    
+                    // 计算内容词频
+                    const count = (contentLower.split(kw).length - 1);
+                    if (count > 0) {
+                        // 越长词语匹配分越高，比如 3-gram 匹配分高于 1-gram
+                        score += count * (kw.length * 4);
+                    }
+                });
+
+                return { note, score };
+            });
+
+            return scored
+                .filter(item => item.score > 0)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, maxResults)
+                .map(item => item.note);
+        }
+
+        // C. 消息渲染与气泡生成器 (Gemini 扁平无背景框排列)
+        function addChatMessage(role, text, reasoningContent = "") {
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${role}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'bubble-avatar';
+            
+            if (role === 'user') {
+                avatar.textContent = 'HP';
+            } else {
+                avatar.innerHTML = `<div class="bubble-avatar-inner"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-logo-grad)"/></svg></div>`;
+            }
+            
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = 'bubble-content-wrapper';
+            
+            const senderName = document.createElement('div');
+            senderName.className = 'bubble-sender-name';
+            senderName.textContent = role === 'user' ? 'Hijau Pandan' : 'Gemini';
+            
+            const content = document.createElement('div');
+            content.className = 'bubble-content markdown-body';
+            
+            if (role === 'ai') {
+                // 如果是 AI 回答且带有思维链 (Reasoning content from R1)
+                if (reasoningContent) {
+                    const thinkingContainer = document.createElement('div');
+                    thinkingContainer.className = 'thinking-container';
+
+                    const thinkingHeader = document.createElement('div');
+                    thinkingHeader.className = 'thinking-header';
+                    thinkingHeader.innerHTML = `
+                        <svg class="thinking-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                        <span>🧠 已深度思考 (展开查看思维链)...</span>
+                    `;
+
+                    const thinkingBody = document.createElement('div');
+                    thinkingBody.className = 'thinking-body';
+                    thinkingBody.innerHTML = marked.parse(reasoningContent);
+
+                    // 折叠绑定
+                    thinkingHeader.onclick = () => {
+                        const arrow = thinkingHeader.querySelector('.thinking-arrow');
+                        const isCollapsed = thinkingBody.classList.toggle('collapsed');
+                        arrow.classList.toggle('collapsed', isCollapsed);
+                    };
+
+                    thinkingContainer.appendChild(thinkingHeader);
+                    thinkingContainer.appendChild(thinkingBody);
+                    content.appendChild(thinkingContainer);
+                }
+
+                const answerBody = document.createElement('div');
+                answerBody.innerHTML = marked.parse(text);
+                content.appendChild(answerBody);
+            } else {
+                content.textContent = text;
+            }
+            
+            contentWrapper.appendChild(senderName);
+            contentWrapper.appendChild(content);
+            bubble.appendChild(avatar);
+            bubble.appendChild(contentWrapper);
+            
+            aiChatMessages.appendChild(bubble);
+            aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const msg = document.createElement('div');
+            msg.style.cssText = 'text-align: center; color: var(--text-muted); font-size: 11px; margin: 10px 0; background: rgba(255,255,255,0.02); border-radius: 20px; padding: 5px 16px; display: inline-block; align-self: center; border: 1px solid var(--border-color); width: fit-content; max-width: 90%;';
+            msg.textContent = `📢 ${text}`;
+            aiChatMessages.appendChild(msg);
+            aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+        }
+
+        async function callDeepSeekAPI(userMessage) {
+            // A. 获取用户选中的检索范围与模型
+            const scope = document.getElementById('ai-context-scope')?.value || 'all';
+            const selectedModel = aiModelSelector ? aiModelSelector.value : 'gemini-2.5-flash';
+            
+            // B. 获取关联上下文的便签
+            let contextNotes = [];
+            if (scope === 'current-note' && currentSelectedNote) {
+                contextNotes = [currentSelectedNote];
+            } else if (scope === 'current-cat' && activeCategoryName) {
+                contextNotes = rawNotes.filter(n => n.category === activeCategoryName);
+            } else {
+                // 'all' - 智能混合检索模式，使用 RAG 搜索
+                contextNotes = findRelevantNotesLocal(userMessage, 5); // 检索前 5 篇
+            }
+
+            // 计算分类统计
+            const allCategoriesSummary = {};
+            rawNotes.forEach(n => {
+                const cat = n.category || '未分类';
+                allCategoriesSummary[cat] = (allCategoriesSummary[cat] || 0) + 1;
+            });
+
+            // C. 组装 System Prompt，注入宏观分析画像和微观记忆碎片
+            const systemPrompt = `你是一位顶级、温和、富有同理心且智慧非凡的“个人人生轨迹分析师与灵魂导师”（Personal Historian & Soul Mentor）。
+用户的个人便签、日记和感悟数据已经被安全地放置在你的背景库中。你的核心职责是陪伴用户回顾、梳理 and 分析他们过去几年的成长变化、心路历程、情绪起伏、技术积累、以及事业轨迹，并带给他们深刻且有力量的洞见与鼓励。
+
+【用户的便签库统计画像】
+- 全量便签总数：${rawNotes.length} 篇
+- 所有分类目录：${JSON.stringify(Object.keys(allCategoriesSummary).map(k => `${k} (${allCategoriesSummary[k]}篇)`))}
+- 当前对话过滤范围：${scope === 'current-note' ? '仅限当前单篇便签' : scope === 'current-cat' ? `仅限分类：${activeCategoryName}` : '全库智能混合检索模式'}
+
+【从用户便签中智能匹配出的“高价值记忆碎片与历史原文选段”】
+${contextNotes.map((n, i) => `--- 记忆碎片 #${i+1} ---
+标题: ${n.title}
+时间: ${n.date}
+分类: ${n.category}
+原文内容:
+${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略后续字数……)' : ''}`).join('\n\n')}
+
+【你的对话与回复原则】
+1. 你的语气必须温柔、智慧、真诚、包容，像一位陪伴他多年的挚友或富有同理心的人生导师。
+2. 回答用户问题时，必须深度结合上方的“记忆碎片”中他的【历史原文选段】，并且【明确引用】他便签的标题、日期、或某句原文，来说明他当时的状态，证明你确实在仔细倾听他的过去。严禁胡编乱造、凭空捏造事实。
+3. 请在对话中多帮他梳理时间线或归纳成长，例如帮他总结：“在 2024 年你写到了很多关于迷茫的词，但在 2025 年你的文字充满笃定……”
+4. 使用非常优雅的 Markdown 进行格式排版，多用段落引用（> ）、粗体、小标题以及生动温和的 emoji 表情使回复极富可读性。`;
+
+            // 维护对话上下文
+            if (aiMessageHistory.length === 0) {
+                aiMessageHistory.push({ "role": "system", "content": systemPrompt });
+            } else {
+                aiMessageHistory[0].content = systemPrompt; // 更新系统 Prompt 同步 RAG 信息
+            }
+
+            aiMessageHistory.push({ "role": "user", "content": userMessage });
+
+            // 保持对话历史在 15 轮以内，防止 Token 溢出
+            if (aiMessageHistory.length > 31) {
+                aiMessageHistory.splice(1, 2); // 移除最早的一轮对话，保留 system 提示
+            }
+
+            // 创建加载状态
+            const loadingBubble = document.createElement('div');
+            loadingBubble.className = 'chat-bubble ai';
+            loadingBubble.innerHTML = `
+                <div class="bubble-avatar">
+                    <div class="bubble-avatar-inner">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-logo-grad)"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="bubble-content-wrapper">
+                    <div class="bubble-sender-name">Gemini</div>
+                    <div class="bubble-content" style="color:var(--text-muted); font-style:italic; display:flex; align-items:center; gap:8px;">
+                        <span style="display:inline-block; width:6px; height:6px; background:#8ab4f8; border-radius:50%; animation: pulse 1s infinite alternate;"></span>
+                        <span>Gemini 正在静心翻阅你的历史便签，整理思绪中...</span>
+                    </div>
+                </div>
+            `;
+            aiChatMessages.appendChild(loadingBubble);
+
+            let apiUrl = DEEPSEEK_API_URL || "https://api.deepseek.com/chat/completions";
+            let apiKey = DEEPSEEK_API_KEY;
+            let providerName = "DeepSeek";
+
+            if (selectedModel.startsWith("gemini-")) {
+                apiKey = GEMINI_API_KEY;
+                providerName = "Google Gemini";
+            }
+
+            // ⚠️ API Key 空值检测 —— 在发出请求前先校验，防止 401 无意义请求
+            if (!apiKey || apiKey.trim() === "") {
+                loadingBubble.remove();
+                addChatMessage('ai', `🔑 **${providerName} API Key 未配置**\n\n您还没有输入 **${providerName}** 的 API 密钥。请点击输入框右侧的 **⚙️ 配置按钮** 进行设置，或者在弹出的面板中填入您的密钥后点击保存，即可开始对话！`);
+                // 自动打开设置面板引导用户
+                const modal = document.getElementById('ai-settings-modal');
+                const inputKey = document.getElementById(selectedModel.startsWith('gemini-') ? 'input-gemini-key' : 'input-deepseek-key');
+                if (inputKey) inputKey.value = '';
+                const urlInput = document.getElementById('input-deepseek-url');
+                if (urlInput) urlInput.value = DEEPSEEK_API_URL;
+                const geminiInput = document.getElementById('input-gemini-key');
+                if (geminiInput) geminiInput.value = GEMINI_API_KEY;
+                const dsInput = document.getElementById('input-deepseek-key');
+                if (dsInput) dsInput.value = DEEPSEEK_API_KEY;
+                if (modal) modal.style.display = 'flex';
+                return;
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 40000); // 40秒超时限制
+
+            try {
+                let aiReply = "";
+                let reasoning = "";
+
+                if (selectedModel.startsWith("gemini-")) {
+                    const contents = [];
+                    let systemInstruction = null;
+
+                    aiMessageHistory.forEach(msg => {
+                        if (msg.role === 'system') {
+                            systemInstruction = {
+                                parts: [{ text: msg.content }]
+                            };
+                        } else {
+                            contents.push({
+                                role: msg.role === 'assistant' ? 'model' : 'user',
+                                parts: [{ text: msg.content }]
+                            });
+                        }
+                    });
+
+                    // 使用原生 Gemini API，支持浏览器 CORS，避免 404 / Preflight OPTIONS 问题
+                    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+                    
+                    const response = await fetch(geminiUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            contents: contents,
+                            ...(systemInstruction && { systemInstruction: systemInstruction }),
+                            generationConfig: {
+                                temperature: 0.7
+                            }
+                        }),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        throw new Error(`API 访问失败，状态码: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts) {
+                        aiReply = result.candidates[0].content.parts[0].text;
+                    } else {
+                        throw new Error("Gemini API 返回了空内容或未预期格式的候选文本");
+                    }
+                } else {
+                    const response = await fetch(apiUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: selectedModel,
+                            messages: aiMessageHistory,
+                            stream: false
+                        }),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        throw new Error(`API 访问失败，状态码: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    aiReply = result.choices[0].message.content;
+                    reasoning = result.choices[0].message.reasoning_content || "";
+                }
+
+                // 移除加载状态
+                loadingBubble.remove();
+
+                // 渲染 AI 消息 (传入思维链)
+                addChatMessage('ai', aiReply, reasoning);
+
+                // 保存历史记录
+                if (reasoning) {
+                    aiMessageHistory.push({ 
+                        "role": "assistant", 
+                        "content": aiReply,
+                        "reasoning_content": reasoning 
+                    });
+                } else {
+                    aiMessageHistory.push({ "role": "assistant", "content": aiReply });
+                }
+
+                if (btnExportAi) btnExportAi.style.display = 'flex';
+
+            } catch (err) {
+                clearTimeout(timeoutId);
+                loadingBubble.remove();
+                
+                let errMsg = err.message;
+                if (err.name === 'AbortError') {
+                    errMsg = "API 请求已超时（40秒内未收到响应），模型可能没有做出应答或网络连接中断。";
+                }
+                
+                addChatMessage('ai', `❌ **与大模型对话通信失败**\n\n原因: ${errMsg}\n\n💡 *提示: 请确保您的电脑网络畅通，且配置的 ${providerName} API Key 拥有充足的余额与正确的网络连接。如果使用的是 Google Gemini，请保证能够顺畅访问 Google API 服务。*`);
+                console.error("API 调用失败:", err);
+            }
+        }
+
+        // E. 输入框与发送按钮绑定事件
+        aiChatInput.addEventListener('input', () => {
+            aiChatInput.style.height = 'auto';
+            aiChatInput.style.height = `${Math.min(120, aiChatInput.scrollHeight)}px`;
+            
+            // 输入点亮发送按钮
+            if (aiChatInput.value.trim().length > 0) {
+                btnSendAi.classList.add('active');
+            } else {
+                btnSendAi.classList.remove('active');
+            }
+        });
+
+        async function handleUserSend() {
+            const query = aiChatInput.value.trim();
+            if (!query) return;
+
+            aiChatInput.value = '';
+            aiChatInput.style.height = 'auto';
+            btnSendAi.classList.remove('active');
+
+            // 移除欢迎引导区
+            const welcomeMsg = document.querySelector('.ai-msg-welcome');
+            if (welcomeMsg) welcomeMsg.style.display = 'none';
+
+            addChatMessage('user', query);
+            await callDeepSeekAPI(query);
+        }
+
+        btnSendAi.addEventListener('click', handleUserSend);
+
+        aiChatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleUserSend();
+            }
+        });
+
+        // 预设问题卡片点击触发
+        window.sendAiPreset = async function(presetText) {
+            const welcomeMsg = document.querySelector('.ai-msg-welcome');
+            if (welcomeMsg) welcomeMsg.style.display = 'none';
+
+            addChatMessage('user', presetText);
+            await callDeepSeekAPI(presetText);
+        }
+
+        // F. 发起新对话按钮绑定
+        const btnNewChat = document.getElementById('btn-new-chat');
+        if (btnNewChat) {
+            btnNewChat.addEventListener('click', () => {
+                aiMessageHistory = [];
+                aiChatMessages.innerHTML = '';
+                
+                const welcomeMsg = document.createElement('div');
+                welcomeMsg.className = 'ai-msg-welcome';
+                welcomeMsg.innerHTML = `
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: 20px; animation: pulse 2s infinite ease-in-out;">
+                        <path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-wel-grad)"/>
+                        <defs>
+                            <linearGradient id="gemini-star-wel-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#4285f4"/>
+                                <stop offset="50%" stop-color="#9b72cb"/>
+                                <stop offset="100%" stop-color="#d96570"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div>
+                        <span class="gemini-gradient-title">Hijau，需要我帮您做点什么？</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13.5px; line-height: 1.6; max-width: 520px; margin: 0 auto 24px auto;">
+                        我是你的本地 Gemini 智能助理。我已经深度关联了你从 OPPO 便签中导出的 <strong style="color:var(--primary);" id="ai-note-count">${rawNotes.length}</strong> 篇历史文本。我们可以立刻开始深度问答，回顾你过去几年的思绪与成长。
+                    </p>
+                    
+                    <div class="ai-preset-cards-grid">
+                        <div class="ai-preset-card" onclick="sendAiPreset('📅 总结我过去几年的情感与心路历程，看看我最常有哪些情绪起伏和心理变化？')">
+                            <div class="preset-title">🎭 情感心路回顾</div>
+                            <div class="preset-desc">分析我文字中流露的喜怒哀乐与成长变化</div>
+                        </div>
+                        <div class="ai-preset-card" onclick="sendAiPreset('💡 梳理我这些年在技术、学习或事业上的成长轨迹和核心收获。')">
+                            <div class="preset-title">🚀 事业成长轨迹</div>
+                            <div class="preset-desc">挖掘我记录的学习心得与工作难关</div>
+                        </div>
+                        <div class="ai-preset-card" onclick="sendAiPreset('🧘&zwj;‍♂️ 分析我这些年来最常思考的哲学问题、人生困惑以及自我解答。')">
+                            <div class="preset-title">🔍 哲学自我追问</div>
+                            <div class="preset-desc">总结我对人生、理想与自我的不断探索</div>
+                        </div>
+                        <div class="ai-preset-card" onclick="sendAiPreset('🌟 找出我便签日记中提到最多次的关键词，并为我构建几个我的人生核心关键词。')">
+                            <div class="preset-title">✨ 人生词频提炼</div>
+                            <div class="preset-desc">通过数据做词频分析，刻画人生特征</div>
+                        </div>
+                    </div>
+                `;
+                aiChatMessages.appendChild(welcomeMsg);
+                
+                // 自动跳回 AI 灵魂对话视图并展开
+                btnTabAi.click();
+            });
+        }
+
+        // ==================== 🛠️ API 设置模态框与对话导出事件监听器绑定 ====================
+        const aiSettingsModal = document.getElementById('ai-settings-modal');
+        const btnAiSettings = document.getElementById('btn-ai-settings');
+        const btnCloseSettings = document.getElementById('btn-close-settings');
+        const btnSaveSettings = document.getElementById('btn-save-settings');
+        const inputGeminiKey = document.getElementById('input-gemini-key');
+        const inputDeepseekKey = document.getElementById('input-deepseek-key');
+        const inputDeepseekUrl = document.getElementById('input-deepseek-url');
+
+        if (btnAiSettings && aiSettingsModal) {
+            btnAiSettings.addEventListener('click', () => {
+                // 打开模态框并填充当前 Key 变量值
+                if (inputGeminiKey) inputGeminiKey.value = GEMINI_API_KEY;
+                if (inputDeepseekKey) inputDeepseekKey.value = DEEPSEEK_API_KEY;
+                if (inputDeepseekUrl) inputDeepseekUrl.value = DEEPSEEK_API_URL;
+                aiSettingsModal.style.display = 'flex';
+            });
+        }
+
+        if (btnCloseSettings && aiSettingsModal) {
+            btnCloseSettings.addEventListener('click', () => {
+                aiSettingsModal.style.display = 'none';
+            });
+        }
+
+        // 点击遮罩层也可以关闭模态框
+        if (aiSettingsModal) {
+            aiSettingsModal.addEventListener('click', (e) => {
+                if (e.target === aiSettingsModal) {
+                    aiSettingsModal.style.display = 'none';
+                }
+            });
+        }
+
+        if (btnSaveSettings && aiSettingsModal) {
+            btnSaveSettings.addEventListener('click', () => {
+                const geminiVal = inputGeminiKey ? inputGeminiKey.value.trim() : "";
+                const deepseekVal = inputDeepseekKey ? inputDeepseekKey.value.trim() : "";
+                const deepseekUrlVal = inputDeepseekUrl ? inputDeepseekUrl.value.trim() : "";
+
+                GEMINI_API_KEY = geminiVal;
+                DEEPSEEK_API_KEY = deepseekVal;
+                DEEPSEEK_API_URL = deepseekUrlVal || "https://api.deepseek.com/chat/completions";
+
+                localStorage.setItem('GEMINI_API_KEY', geminiVal);
+                localStorage.setItem('DEEPSEEK_API_KEY', deepseekVal);
+                localStorage.setItem('DEEPSEEK_API_URL', DEEPSEEK_API_URL);
+
+                alert('✅ API 密钥配置及自定义端点已成功保存！');
+                aiSettingsModal.style.display = 'none';
+            });
+        }
+
+        // AI 对话导出为 Markdown
+        if (btnExportAi) {
+            btnExportAi.addEventListener('click', () => {
+                if (aiMessageHistory.length <= 1) {
+                    alert('当前没有可导出的对话记录！');
+                    return;
+                }
+                let md = `# XinAINote AI 灵魂对话记录导出\n\n导出时间: ${new Date().toLocaleString()}\n\n---\n\n`;
+                aiMessageHistory.forEach(msg => {
+                    if (msg.role === 'system') return;
+                    const roleName = msg.role === 'user' ? '用户 (Hijau Pandan)' : 'AI 助手 (Gemini/DeepSeek)';
+                    md += `### 👤 ${roleName}\n\n${msg.content}\n\n`;
+                    if (msg.reasoning_content) {
+                        md += `> 🧠 **思维链深度思考:**\n> ${msg.reasoning_content.split('\n').join('\n> ')}\n\n`;
+                    }
+                    md += `---\n\n`;
+                });
+                const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `XinAINote_AI对答记录_${new Date().toISOString().slice(0, 10)}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
+        }
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

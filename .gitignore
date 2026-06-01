@@ -1,0 +1,18 @@
+# Dependency directories
+node_modules/
+server/node_modules/
+
+# Environment variables
+.env
+server/.env
+*.env
+
+# Large data files / logs
+notes_data.js
+oppo_notes_export_*.json
+payload.json
+
+# System / IDE files
+.DS_Store
+.vscode/
+.idea/
