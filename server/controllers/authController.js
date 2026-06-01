@@ -22,14 +22,18 @@ export async function register(req, res) {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // Save user
-    const result = await query(
-      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username',
+    const insertResult = await query(
+      'INSERT INTO users (username, password_hash) VALUES ($1, $2)',
       [username, passwordHash]
     );
 
-    res.status(201).json({ message: 'User registered successfully', user: result.rows[0] });
+    const insertId = insertResult.rows.insertId;
+    const userRes = await query('SELECT id, username FROM users WHERE id = $1', [insertId]);
+    const user = userRes.rows[0];
+
+    res.status(201).json({ message: 'User registered successfully', user });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error during registration' });
+    res.status(500).json({ error: 'Internal server error during registration: ' + err.message });
   }
 }
 

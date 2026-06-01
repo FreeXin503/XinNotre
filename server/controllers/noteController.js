@@ -73,14 +73,14 @@ export async function createNote(req, res) {
   const wordCount = content.length;
 
   try {
-    const result = await query(
+    await query(
       `INSERT INTO notes (id, user_id, title, content, category, word_count, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-       RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       [id, userId, title, content, category, wordCount]
     );
 
-    res.status(201).json(result.rows[0]);
+    const noteRes = await query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
+    res.status(201).json(noteRes.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create note: ' + err.message });
   }
@@ -124,15 +124,15 @@ export async function updateNote(req, res) {
     const finalContent = content !== undefined ? content : currentNote.content;
     const finalCategory = category !== undefined ? category : currentNote.category;
 
-    const result = await query(
+    await query(
       `UPDATE notes
        SET title = $1, content = $2, category = $3, word_count = $4, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5 AND user_id = $6
-       RETURNING *`,
+       WHERE id = $5 AND user_id = $6`,
       [finalTitle, finalContent, finalCategory, wordCount, id, userId]
     );
 
-    res.json(result.rows[0]);
+    const noteRes = await query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
+    res.json(noteRes.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update note: ' + err.message });
   }
