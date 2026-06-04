@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'xinnote_super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export default function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;

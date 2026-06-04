@@ -1,0 +1,35 @@
+{
+    "stage":  "requirement_doc",
+    "source_stage":  "bounded_memory_recall",
+    "owner":  "state_store",
+    "disclosure_level":  "decision_focused",
+    "generated_at":  "2026-06-03T16:11:53Z",
+    "capsule_count":  1,
+    "selected_capsules":  [
+                              {
+                                  "capsule_id":  "ad539f8c4b7d7b8a",
+                                  "owner":  "state_store",
+                                  "lane":  null,
+                                  "kind":  "fallback_digest",
+                                  "updated_at":  null,
+                                  "title":  "Task focus: optimize frontend UI, make layout more spacious, add collapsible sections",
+                                  "why_now":  "Matched state_store memory for requirement_doc.",
+                                  "expansion_ref":  "E:\\GzrjxyGzrjxyGzrjxyGzrjxy\\Project documents for all departments\\AInything\\OPPO便签导出系统\\outputs\\runtime\\vibe-sessions\\20260603T161142Z-a310dd45\\memory-activation\\skeleton-local-digest.json#ad539f8c4b7d7b8a",
+                                  "summary_lines":  [
+                                                        "Task focus: optimize frontend UI, make layout more spacious, add collapsible sections",
+                                                        "Git branch: ",
+                                                        "All required governed runtime prerequisite paths are present."
+                                                    ]
+                              }
+                          ],
+    "items":  [
+                  "Task focus: optimize frontend UI, make layout more spacious, add collapsible sections",
+                  "Git branch: "
+              ],
+    "estimated_tokens":  25,
+    "budget":  {
+                   "top_k":  2,
+                   "max_tokens":  120,
+                   "max_chars_per_item":  260
+               }
+}

@@ -1,0 +1,18 @@
+{
+    "run_id":  "20260603T161459Z-2e1404a4",
+    "root_run_id":  "20260603T161459Z-2e1404a4",
+    "stages":  [
+                   {
+                       "stage_name":  "skeleton_check",
+                       "run_id":  "20260603T161459Z-2e1404a4",
+                       "root_run_id":  "20260603T161459Z-2e1404a4",
+                       "previous_stage_name":  null,
+                       "previous_stage_receipt_path":  null,
+                       "current_receipt_path":  "E:\\GzrjxyGzrjxyGzrjxyGzrjxy\\Project documents for all departments\\AInything\\OPPO便签导出系统\\outputs\\runtime\\vibe-sessions\\20260603T161459Z-2e1404a4\\skeleton-receipt.json",
+                       "transition_validated":  true,
+                       "validated_at":  "2026-06-03T16:15:01Z"
+                   }
+               ],
+    "last_stage_name":  "skeleton_check",
+    "updated_at":  "2026-06-03T16:15:01Z"
+}

@@ -1,0 +1,17 @@
+{
+    "stage":  "skeleton_check",
+    "owner":  "state_store",
+    "status":  "fallback_local_digest",
+    "generated_at":  "2026-06-03T13:06:45Z",
+    "source_receipt_path":  "E:\\GzrjxyGzrjxyGzrjxyGzrjxy\\Project documents for all departments\\AInything\\OPPO便签导出系统\\outputs\\runtime\\vibe-sessions\\20260603T130643Z-d1cb0389\\skeleton-receipt.json",
+    "items":  [
+                  "Task focus: 帮我在不改变功能的前提下，优化我这个项目 Deliverable: Governed implementation artifacts, verification evidence, and cleanup receipts. Constraints: Do not bypass the fixed six-stage governed runtime.; Do not widen scope silently...",
+                  "Git branch: ",
+                  "All required governed runtime prerequisite paths are present."
+              ],
+    "budget":  {
+                   "top_k":  3,
+                   "max_tokens":  96,
+                   "max_chars_per_item":  220
+               }
+}

@@ -1,0 +1,136 @@
+/* ==================== XinNote 动效系统 (Dopamine Micro-Animations) ==================== */
+
+/* --- 页面入场 --- */
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.app-container > * {
+    animation: fadeSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 交错入场延迟 */
+.sidebar        { animation-delay: 0.05s; }
+.notes-panel    { animation-delay: 0.1s; }
+.reader-panel   { animation-delay: 0.15s; }
+
+/* --- 选中脉冲微光 --- */
+@keyframes subtlePulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(138, 180, 248, 0.04); }
+    50%      { box-shadow: 0 0 28px rgba(138, 180, 248, 0.10); }
+}
+
+.note-card.active {
+    animation: subtlePulse 3s ease-in-out infinite;
+}
+
+/* --- 按钮点击反馈 --- */
+button:active:not(.tab-btn):not(.sidebar-settings-btn):not(.header-icon-btn):not(.panel-close-btn) {
+    transform: scale(0.96) !important;
+    transition: transform 0.08s ease !important;
+}
+
+.tab-btn:active {
+    transform: scale(0.95);
+    transition: transform 0.08s ease;
+}
+
+/* --- 卡片悬浮抬升 --- */
+.note-card:hover {
+    transform: translateY(-1px);
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(138, 180, 248, 0.08);
+}
+
+/* --- AI 对话气泡入场 (保留原有 bubbleIn) --- */
+@keyframes bubbleIn {
+    0%   { opacity: 0; transform: translateY(16px) scale(0.98); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* --- 流星 / 闪烁加载 --- */
+@keyframes sparkle {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+}
+
+.logo svg {
+    animation: sparkle 3s ease-in-out infinite;
+}
+
+/* --- 输入框聚焦发光 --- */
+.gemini-pill-bar:focus-within {
+    border-color: rgba(138, 180, 248, 0.25) !important;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(138, 180, 248, 0.08), 0 0 32px rgba(138, 180, 248, 0.06) !important;
+}
+
+/* --- 分类项 hover 滑动 --- */
+.category-item {
+    transition: all var(--transition-speed) var(--transition-curve), padding-left 0.25s ease;
+}
+.category-item:hover {
+    padding-left: 22px;
+}
+
+/* --- 发送按钮活跃态 --- */
+.pill-send-btn.active {
+    animation: sendGlow 2s ease-in-out infinite;
+}
+
+@keyframes sendGlow {
+    0%, 100% { box-shadow: 0 2px 8px rgba(138, 180, 248, 0.3); }
+    50%      { box-shadow: 0 2px 20px rgba(138, 180, 248, 0.5); }
+}
+
+/* --- 新对话按钮 hover --- */
+.new-chat-btn {
+    transition: all var(--transition-speed) var(--transition-curve);
+}
+.new-chat-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* --- 统计数字弹跳 --- */
+@keyframes countUp {
+    from { transform: scale(0.8); opacity: 0.5; }
+    to   { transform: scale(1); opacity: 1; }
+}
+.stat-num {
+    animation: countUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* --- 主题切换标签平滑 --- */
+body, body * {
+    transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* --- 侧边栏分类活跃指示器 --- */
+.category-item.active {
+    position: relative;
+}
+.category-item.active::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--primary);
+    animation: subtlePulse 2s ease-in-out infinite;
+}
+
+/* --- 下拉刷新 / 拖拽区脉冲 --- */
+@keyframes dropPulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50%      { transform: scale(1.05); opacity: 1; }
+}
+.drop-icon {
+    animation: dropPulse 2s ease-in-out infinite;
+}

@@ -1,0 +1,47 @@
+{
+    "schema_version":  2,
+    "state_model":  "binary_used_unused",
+    "used":  [
+                 {
+                     "skill_id":  "manuscript-as-code",
+                     "skill_md_path":  "C:\\Users\\Zxin\\.gemini\\antigravity\\skills\\vibe\\bundled\\skills\\manuscript-as-code\\SKILL.runtime-mirror.md",
+                     "skill_md_sha256":  "81de88373ee73c17f829b217fc19efaa702bfee8c7b9772d31c81614a2d84180",
+                     "evidence":  [
+                                      {
+                                          "stage":  "requirement_doc",
+                                          "artifact_path":  "2026-06-04-optimize-frontend-ui-make-layout-more-spacious-add-collapsible-s.md",
+                                          "impact":  "Requirement doc adopts the loaded manuscript-as-code SKILL.md as the workflow authority for downstream planning and completion evidence."
+                                      }
+                                  ]
+                 }
+             ],
+    "unused":  null,
+    "used_skills":  [
+                        "manuscript-as-code"
+                    ],
+    "unused_skills":  [
+
+                      ],
+    "loaded_skills":  [
+                          {
+                              "skill_id":  "manuscript-as-code",
+                              "skill_md_path":  "C:\\Users\\Zxin\\.gemini\\antigravity\\skills\\vibe\\bundled\\skills\\manuscript-as-code\\SKILL.runtime-mirror.md",
+                              "skill_md_sha256":  "81de88373ee73c17f829b217fc19efaa702bfee8c7b9772d31c81614a2d84180",
+                              "load_status":  "loaded_full_skill_md",
+                              "loaded_at_stage":  "skeleton_check",
+                              "loaded_byte_count":  1861,
+                              "loaded_line_count":  58
+                          }
+                      ],
+    "evidence":  [
+                     {
+                         "skill_id":  "manuscript-as-code",
+                         "stage":  "requirement_doc",
+                         "artifact_ref":  "2026-06-04-optimize-frontend-ui-make-layout-more-spacious-add-collapsible-s.md",
+                         "impact_summary":  "Requirement doc adopts the loaded manuscript-as-code SKILL.md as the workflow authority for downstream planning and completion evidence.",
+                         "skill_md_path":  "C:\\Users\\Zxin\\.gemini\\antigravity\\skills\\vibe\\bundled\\skills\\manuscript-as-code\\SKILL.runtime-mirror.md",
+                         "skill_md_sha256":  "81de88373ee73c17f829b217fc19efaa702bfee8c7b9772d31c81614a2d84180"
+                     }
+                 ],
+    "unused_reasons":  null
+}

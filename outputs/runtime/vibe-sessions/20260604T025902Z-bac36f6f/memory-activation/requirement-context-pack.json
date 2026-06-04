@@ -1,0 +1,35 @@
+{
+    "stage":  "requirement_doc",
+    "source_stage":  "bounded_memory_recall",
+    "owner":  "state_store",
+    "disclosure_level":  "decision_focused",
+    "generated_at":  "2026-06-04T02:59:14Z",
+    "capsule_count":  1,
+    "selected_capsules":  [
+                              {
+                                  "capsule_id":  "15440db483f6947c",
+                                  "owner":  "state_store",
+                                  "lane":  null,
+                                  "kind":  "fallback_digest",
+                                  "updated_at":  null,
+                                  "title":  "Task focus: Fix frontend JS errors in index.html and preview.html. Redesign the dark theme to use deep blue/navy tones instead of slate gray...",
+                                  "why_now":  "Matched state_store memory for requirement_doc.",
+                                  "expansion_ref":  "E:\\GzrjxyGzrjxyGzrjxyGzrjxy\\Project documents for all departments\\AInything\\OPPO便签导出系统\\outputs\\runtime\\vibe-sessions\\20260604T025902Z-bac36f6f\\memory-activation\\skeleton-local-digest.json#15440db483f6947c",
+                                  "summary_lines":  [
+                                                        "Task focus: Fix frontend JS errors in index.html and preview.html. Redesign the dark theme to use deep blue/navy tones instead of slate gray. Make the UI feel dark blue and immersive.",
+                                                        "Git branch: ",
+                                                        "All required governed runtime prerequisite paths are present."
+                                                    ]
+                              }
+                          ],
+    "items":  [
+                  "Task focus: Fix frontend JS errors in index.html and preview.html. Redesign the dark theme to use deep blue/navy tones instead of slate gray. Make the UI feel dark blue and immersive.",
+                  "Git branch: "
+              ],
+    "estimated_tokens":  49,
+    "budget":  {
+                   "top_k":  2,
+                   "max_tokens":  120,
+                   "max_chars_per_item":  260
+               }
+}

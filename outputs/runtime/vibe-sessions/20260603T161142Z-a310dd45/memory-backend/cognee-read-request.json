@@ -1,0 +1,19 @@
+{
+    "lane":  "cognee",
+    "stage":  "skeleton_check",
+    "task":  "optimize frontend UI, make layout more spacious, add collapsible sections",
+    "top_k":  3,
+    "max_chars_per_item":  220,
+    "keywords":  [
+                     "optimize",
+                     "frontend",
+                     "make",
+                     "layout",
+                     "more",
+                     "spacious",
+                     "add",
+                     "collapsible",
+                     "sections"
+                 ],
+    "project_key_source":  null
+}

@@ -1,0 +1,35 @@
+{
+    "stage":  "requirement_doc",
+    "source_stage":  "bounded_memory_recall",
+    "owner":  "state_store",
+    "disclosure_level":  "decision_focused",
+    "generated_at":  "2026-06-03T16:13:57Z",
+    "capsule_count":  1,
+    "selected_capsules":  [
+                              {
+                                  "capsule_id":  "6389b9c9e567217a",
+                                  "owner":  "state_store",
+                                  "lane":  null,
+                                  "kind":  "fallback_digest",
+                                  "updated_at":  null,
+                                  "title":  "Task focus: continue-vibe optimize frontend UI, make layout more spacious, add collapsible sections deliverable-governed-implementation-arti...",
+                                  "why_now":  "Matched state_store memory for requirement_doc.",
+                                  "expansion_ref":  "E:\\GzrjxyGzrjxyGzrjxyGzrjxy\\Project documents for all departments\\AInything\\OPPO便签导出系统\\outputs\\runtime\\vibe-sessions\\20260603T161349Z-e870c2a5\\memory-activation\\skeleton-local-digest.json#6389b9c9e567217a",
+                                  "summary_lines":  [
+                                                        "Task focus: continue-vibe optimize frontend UI, make layout more spacious, add collapsible sections deliverable-governed-implementation-artifacts-verification-evidence-and-clea constraint-do-not-bypass-the-fixed-six-stag...",
+                                                        "Git branch: ",
+                                                        "All required governed runtime prerequisite paths are present."
+                                                    ]
+                              }
+                          ],
+    "items":  [
+                  "Task focus: continue-vibe optimize frontend UI, make layout more spacious, add collapsible sections deliverable-governed-implementation-artifacts-verification-evidence-and-clea constraint-do-not-bypass-the-fixed-six-stag...",
+                  "Git branch: "
+              ],
+    "estimated_tokens":  59,
+    "budget":  {
+                   "top_k":  2,
+                   "max_tokens":  120,
+                   "max_chars_per_item":  260
+               }
+}

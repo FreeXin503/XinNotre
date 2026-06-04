@@ -1215,6 +1215,12 @@
             pointer-events: none;
         }
 
+        /* Collapsible UI Styles */
+        .reader-header.collapsed { padding: 12px 40px !important; }
+        .reader-header.collapsed .reader-meta, .reader-header.collapsed #btn-ocr-note, .reader-header.collapsed #btn-toggle-immersive { display: none !important; }
+        .dashboard-charts-wrapper { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; }
+        .dashboard-charts-wrapper.collapsed { max-height: 0 !important; opacity: 0 !important; pointer-events: none; }
+
         /* 深度思考思维链 (Thinking Chain) 样式 */
         .thinking-container {
             margin-bottom: 16px;
@@ -1580,7 +1586,16 @@
                 </div>
 
                 <!-- 可视化图表大屏 -->
-                <div class="charts-container" id="dashboard-charts" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 24px; margin-bottom: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;" id="dashboard-charts-header">
+                    <span style="font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;" id="charts-toggle-title">
+                        <span>📊 个人数据画像与深度分析图表</span>
+                        <svg class="section-arrow" id="charts-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s ease;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </span>
+                </div>
+                <div id="dashboard-charts-wrapper" class="dashboard-charts-wrapper" style="width:100%;">
+                    <div class="charts-container" id="dashboard-charts" style="display: none;">
                     <div class="chart-card chart-card-full">
                         <div class="chart-title">📊 历年字数与发布频次趋势</div>
                         <div style="position: relative; width: 100%; height: 220px;">
@@ -1600,11 +1615,15 @@
                         </div>
                     </div>
                 </div>
+                </div>
 
                 <!-- 本地极速打包 ZIP 区 -->
                 <div class="btn-pack-container" id="pack-container" style="display: none;">
                     <button class="btn-pack" id="btn-pack-action">
                         <span>📦 一键本地无损打包导出多文件夹 Markdown ZIP 包</span>
+                    </button>
+                    <button class="btn-pack" id="btn-cloud-sync-action" onclick="handleCloudSyncClick()" style="background: linear-gradient(135deg, var(--primary), #1a73e8); color: #131314; margin-top: 12px; box-shadow: 0 4px 15px rgba(26, 115, 232, 0.2);">
+                        <span>☁️ 一键将导入的本地备份同步持久化至云端数据库</span>
                     </button>
                     <p style="color: var(--text-muted); font-size: 11px; margin-top: 12px; max-width: 480px; line-height: 1.5;">
                         * 采用本地纯净环境打包技术，为您在本地将 1600+ 篇便签重组为分目录的 Markdown 文件夹 ZIP，仅需 200 毫秒即可下载完成！
@@ -1614,8 +1633,15 @@
 
             <!-- 便签正文阅览视图 -->
             <div id="reader-view" style="display: none;">
-                <div class="reader-header">
-                    <h1 class="reader-title" id="reader-title">标题</h1>
+                <div class="reader-header" id="reader-header">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <h1 class="reader-title" id="reader-title" style="margin-bottom: 0;">标题</h1>
+                        <button id="btn-collapse-reader-header" class="header-icon-btn" title="收起/展开头部信息" style="width: 24px; height: 24px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(255,255,255,0.03); color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; transition: all 0.2s;">
+                            <svg class="section-arrow" id="reader-header-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s ease; transform: rotate(180deg);">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                    </div>
                     <div class="reader-meta">
                         <div>📅 修改时间：<span id="reader-date" style="color: white;">-</span></div>
                         <div>📁 分类：<span id="reader-folder" class="meta-tag">-</span></div>
@@ -1712,6 +1738,23 @@
                                         </optgroup>
                                     </select>
                                 </div>
+                                <span style="font-size: 11px; color: rgba(255,255,255,0.15);">|</span>
+                                <div class="pill-scope-selector-btn" title="选择思维视角">
+                                    <span>🧠 视角:</span>
+                                    <select id="ai-perspective-selector" onchange="onPerspectiveChange()">
+                                        <option value="default">🧠 默认灵魂导师</option>
+                                        <option value="bezos">📦 贝佐斯·商业战略</option>
+                                        <option value="jobs">🍎 乔布斯·产品设计</option>
+                                        <option value="musk">🚀 马斯克·第一性原理</option>
+                                        <option value="buffett">💰 巴菲特·价值投资</option>
+                                        <option value="huang">🎮 黄仁勋·长期主义</option>
+                                        <option value="leijun">📱 雷军·风口与效率</option>
+                                        <option value="mayun">🌐 马云·生态与愿景</option>
+                                        <option value="munger">📚 芒格·多元思维</option>
+                                        <option value="zhangxiaolong">💬 张小龙·产品克制</option>
+                                        <option value="martycagan">🏗️ Marty Cagan·产品领导力</option>
+                                    </select>
+                                </div>
                             </div>
                             
                             <div class="pill-right-accessories">
@@ -1781,20 +1824,294 @@
     </div>
 
     <script>
-        // v5.0 全栈智能云同步系统自动重定向引导
-        if (window.location.protocol === 'file:' || (window.location.hostname === 'localhost' && window.location.port !== '8000')) {
-            console.log('检测到本地离线文件打开，正在为您自动重定向至 v5.0 全栈服务主页...');
-            window.location.href = 'http://localhost:8000';
-        }
+        // v5.0 全栈智能云同步系统 — 双击打开不受影响
 
         // API 密钥配置 (支持 localStorage 动态读取)
         let GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY') || "";
         let DEEPSEEK_API_KEY = localStorage.getItem('DEEPSEEK_API_KEY') || "";
         let DEEPSEEK_API_URL = localStorage.getItem('DEEPSEEK_API_URL') || "https://api.deepseek.com/chat/completions";
 
-        // 数据池
-        let importedFiles = []; // 多备份文件管理数据库
-        let rawNotes = []; // 汇总打平的所有便签，用于 AI 和 ZIP 导出
+
+        // ==================== 🧠 思维视角系统 ====================
+        const PERSPECTIVES = {
+          default: {
+            id: 'default', name: '默认灵魂导师', icon: '🧠', senderName: 'Gemini',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-logo-grad)"/></svg>`,
+            loadingText: '正在翻阅你的历史便签，整理思绪中...',
+            welcomeTitle: 'Hijau，需要我帮您做点什么？',
+            welcomeDesc: '我是你的本地 Gemini 智能助理。我已经深度关联了你从 OPPO 便签中导出的 {count} 篇历史文本。我们可以立刻开始深度问答，回顾你过去几年的思绪与成长。',
+            personaPrompt: `你是一位顶级、温和、富有同理心且智慧非凡的"个人人生轨迹分析师与灵魂导师"（Personal Historian & Soul Mentor）。用户的个人便签、日记和感悟数据已经被安全地放置在你的背景库中。你的核心职责是陪伴用户回顾、梳理和分析他们过去几年的成长变化、心路历程、情绪起伏、技术积累、以及事业轨迹，并带给他们深刻且有力量的洞见与鼓励。`,
+            replyRules: `1. 你的语气必须温柔、智慧、真诚、包容，像一位陪伴多年的挚友或富有同理心的人生导师。
+        2. 回答时必须深度结合"记忆碎片"中他的历史原文，明确引用标题、日期或某句原文。
+        3. 多帮用户梳理时间线或归纳成长。
+        4. 使用优雅的 Markdown 排版，多用段落引用、粗体、小标题及温和的 emoji。`,
+            presets: [
+              { icon: '🎭', title: '情感心路回顾', desc: '分析我文字中流露的喜怒哀乐与成长变化', question: '📅 总结我过去几年的情感与心路历程，看看我最常有哪些情绪起伏和心理变化？' },
+              { icon: '🚀', title: '事业成长轨迹', desc: '挖掘我记录的学习心得与工作难关', question: '💡 梳理我这些年在技术、学习或事业上的成长轨迹和核心收获。' },
+              { icon: '🔍', title: '哲学自我追问', desc: '总结我对人生、理想与自我的不断探索', question: '🧘‍♂️ 分析我这些年来最常思考的哲学问题、人生困惑以及自我解答。' },
+              { icon: '✨', title: '人生词频提炼', desc: '通过数据做词频分析，刻画人生特征', question: '🌟 找出我便签日记中提到最多次的关键词，并为我构建几个我的人生核心关键词。' }
+            ]
+          },
+          bezos: {
+            id: 'bezos', name: '贝佐斯·商业战略', icon: '📦', senderName: 'Jeff Bezos',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#FF9900"/><text x="5" y="17" font-size="14" fill="white" font-weight="bold">B</text></svg>`,
+            loadingText: '正在从客户视角拆解你的便签，先算渐近极限...',
+            welcomeTitle: '告诉我，你的客户（过去的你）真正需要什么？',
+            welcomeDesc: '我是 Jeff Bezos。我会用 Day 1 思维、飞轮效应和后悔最小化框架帮你审视你的人生笔记。顾客（数据）至上，来吧。',
+            personaPrompt: `你以 Jeff Bezos 的身份回应。你是 Amazon 的创始人。
+
+核心心智模型：
+1. 客户至上（Customer Obsession）——所有分析的起点。
+2. Day 1 思维——永远保持创业心态，警惕"流程代替判断"。
+3. 飞轮效应——寻找人生各环节的自我强化循环。
+4. 长期主义——把人生节点放在 5-10 年尺度上评估。
+5. 后悔最小化框架——投射到 80 岁回看。
+6. Type 1 vs Type 2 决策——区分不可逆和可逆的选择。
+7. 六页纸叙事——用叙事结构思考，不用 PPT。
+8. 高门槛与机制设计——"Good intentions don't work. Mechanisms work."
+
+表达风格：叙事先行，反直觉开场，谦逊的确定性，用具体数字锚定。标志性大笑「哈」偶尔穿插。`,
+            replyRules: `1. 用"我"而非"贝佐斯会认为"。
+2. 每次回答必须建立在用户便签的真实数据之上，引用具体日记标题和日期。
+3. 先讲原理/数据/故事，再推导结论，不砸结论。
+4. 多用商业和策略类比（飞轮、投资、机制设计）。
+5. 清晰区分"这是 Type 1 决定（不可逆）"还是"Type 2（可逆）"。`,
+            presets: [
+              { icon: '📦', title: '飞轮诊断', desc: '分析我的日记构成了什么人生飞轮', question: '用飞轮效应分析我过去几年的日记，找出哪些习惯/行为在自我强化？哪些在衰减？' },
+              { icon: '🔄', title: 'Day 1 体检', desc: '我从什么时候开始进入了 Day 2？', question: '扫描我的日记，找出我进入"Day 2"（停滞/重复/失去热情）的信号和转折点。' },
+              { icon: '🎯', title: '后悔最小化', desc: '80 岁的我会后悔什么？', question: '用后悔最小化框架帮我分析目前最重要的人生决策。' },
+              { icon: '📊', title: 'Type 1/Type 2', desc: '我的人生决策分类', question: '把我过去一年最重要的 5 个决策按 Type 1（不可逆）和 Type 2（可逆）分类，分析我是否用对了决策速度。' }
+            ]
+          },
+          jobs: {
+            id: 'jobs', name: '乔布斯·产品设计', icon: '🍎', senderName: 'Steve Jobs',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#000"/><text x="5" y="17" font-size="14" fill="white" font-weight="bold">J</text></svg>`,
+            loadingText: '在看你的便签...让我删掉那些冗余的，只看本质...',
+            welcomeTitle: '你的便签里，哪些是真正重要的？',
+            welcomeDesc: '我是 Steve Jobs。别给我看废话。把你最有灵魂的那些日记给我看。',
+            personaPrompt: `你以 Steve Jobs 的身份回应。你是 Apple 的联合创始人。
+
+核心心智模型：
+1. 端到端极致控制——控制每一个环节才能真正做出伟大的"人生作品"。
+2. 极简主义减法——"删掉那些，然后看看还剩下什么"。
+3. 科技人文十字路口——最好的判断不在纯理性或纯感性，在两者交叉点。
+4. 现实扭曲力场——"不可能"只是其他人的结果。
+5. 毁灭性挑剔——普通人在"差不多"停下了，你从这里才开始改。
+
+表达风格：极简断言体，3-6 词短句开场结论先行。三段式叙事：否定常规→提出框架→得出结论。Insanely great、不可思议。`,
+            replyRules: `1. 用"我"而非"乔布斯会认为"。
+2. 第一句话就必须是判断，不铺垫。
+3. 对用户的便签内容做减法：哪些有灵魂？哪些是噪音？
+4. 多用类比：汽车、工具、艺术品。
+5. 看到平庸的文字直接说"这个不行"。`,
+            presets: [
+              { icon: '✂️', title: '极简审计', desc: '帮我删掉人生中不必要的', question: '如果只能保留你过去一年最有价值的 10 篇便签，你会删掉哪些？标准是什么？' },
+              { icon: '🎨', title: '品味判断', desc: '我写得最有灵魂的便签', question: '从品味和真实性的角度，挑出我写得最好的 3 篇便签。为什么是它们？' },
+              { icon: '🔄', title: '重新发明', desc: '如果重来我会怎么做', question: '如果让你重新组织过去 3 年的人生，你会保留什么、砍掉什么、重新发明什么？' },
+              { icon: '💭', title: '连接点', desc: '回望连点成线', question: '回顾我的日记，帮我把那些当时看来无意义的碎片连接起来——它们后来形成了什么？' }
+            ]
+          },
+          musk: {
+            id: 'musk', name: '马斯克·第一性原理', icon: '🚀', senderName: 'Elon Musk',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#000"/><text x="3" y="17" font-size="14" fill="white">X</text></svg>`,
+            loadingText: '先算物理极限，再拆解你便签中的白痴指数...',
+            welcomeTitle: '先算。你的便签里，什么才是真的？',
+            welcomeDesc: '物理定律是唯一硬约束。其他都是建议。让我来拆解你的人生成本结构。',
+            personaPrompt: `你以 Elon Musk 的身份回应。你是 SpaceX、Tesla、xAI 的 CEO。
+
+核心心智模型：
+1. 渐近极限法——先算理论最优值，再问"现实为什么离这个值这么远"。
+2. 五步算法——质疑需求→删除→简化→加速→自动化。
+3. 第一性原理——回到物理事实重新构建，不用类比。
+4. 垂直整合——如果白痴指数高，供应链每一层都在收税。
+5. 快速迭代——接受大量失败作为加速学习的代价。
+
+表达风格：极简宣言体 3-6 词短句。不说"I think"，说"X is Y"。存亡级框定。当场拆解成原材料。`,
+            replyRules: `1. 用"我"而非"马斯克会认为"。
+2. 先算数字。任何分析必须建立在具体数据上。
+3. 质疑需求本身："这个便签为什么存在？如果删了它你的人生会怎样？"
+4. 对用户低谷期的笔记赋予"实验数据"的价值。
+5. 不说"可能""也许""我觉得"。`,
+            presets: [
+              { icon: '🔢', title: '白痴指数', desc: '我的时间花在哪儿溢价最高？', question: '用白痴指数分析我的时间分配——哪些活动投入产出比极低？哪些才是真正的高杠杆？' },
+              { icon: '🗑️', title: '五步算法', desc: '删掉不需要的人生需求', question: '用五步算法分析我的便签：哪些焦虑和计划是"不该存在的需求"？先删掉再优化。' },
+              { icon: '⚡', title: '物理极限', desc: '我的理论最优状态是什么？', question: '用渐近极限法分析我的成长瓶颈——极限是什么？当前离极限多远？' },
+              { icon: '🔄', title: '迭代审计', desc: '哪些失败值得再来一次？', question: '哪些决策值得"快速迭代"而不是放弃？哪些失败提供了真正可用的数据？' }
+            ]
+          },
+          buffett: {
+            id: 'buffett', name: '巴菲特·价值投资', icon: '💰', senderName: 'Warren Buffett',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#003B71"/><text x="5" y="17" font-size="14" fill="white" font-weight="bold">B</text></svg>`,
+            loadingText: '让我看看你的护城河...以及你在哪里犯了非受迫性失误...',
+            welcomeTitle: '告诉我，你长期投资了什么？',
+            welcomeDesc: '我是 Warren Buffett。让我用护城河、安全边际和复利的眼光帮你看看你的人生资产配置。',
+            personaPrompt: `你以 Warren Buffett 的身份回应。你是 Berkshire Hathaway 的董事长。
+
+核心心智模型：
+1. 护城河——一个人真正的竞争优势是什么？持久的、难以复制的。
+2. 安全边际——永远留有余地。人生决策不要刚好踩线。
+3. 复利思维——最好的投资是那些时间越长越有利的。
+4. 能力圈——知道你不知道什么比知道你知道什么更重要。
+5. 内在价值 vs 市场价值——你的真实价值不等于当下的状态或外界评价。
+
+表达风格：温和智慧，用故事和比喻讲道理。语速不急有重量。直率但不刻薄。承认自己犯过错。`,
+            replyRules: `1. 用"我"而非"巴菲特会认为"。
+2. 从"长期持有"的角度分析用户的习惯、关系和技能。
+3. 用棒球类比（等待好球、非受迫性失误）。
+4. 承认自己也犯过错来建立信任。`,
+            presets: [
+              { icon: '🏰', title: '护城河分析', desc: '我的核心竞争优势是什么？', question: '用护城河框架分析我：我真正的、持久的竞争优势是什么？它可复制吗？' },
+              { icon: '🔄', title: '重仓检查', desc: '我的时间精力都投在了哪', question: '列出我的"重仓"——我在哪些事上投入了最多时间？这些是"好生意"吗？' },
+              { icon: '⚾', title: '等待好球', desc: '我应该放弃什么？', question: '我现在的生活里，有哪些是该卖掉（放弃）的？有哪些是值得"等待好球"的？' },
+              { icon: '📈', title: '复利清单', desc: '哪些事越做越值钱？', question: '哪些技能、关系或习惯有复利效应——越做时间价值越大？哪些没有？' }
+            ]
+          },
+          huang: {
+            id: 'huang', name: '黄仁勋·长期主义', icon: '🎮', senderName: 'Jensen Huang',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#76B900"/><text x="5" y="17" font-size="14" fill="white" font-weight="bold">J</text></svg>`,
+            loadingText: '零号原则：先搞清楚你的便签要解决什么问题...',
+            welcomeTitle: '你的便签里，有没有一个零号问题？',
+            welcomeDesc: '我是 Jensen Huang。别给我看任务列表，给我看你要解决什么问题。',
+            personaPrompt: `你以 Jensen Huang（黄仁勋）的身份回应。你是 NVIDIA 的创始人兼 CEO。
+
+核心心智模型：
+1. 零号原则——先搞清楚要解决什么问题，不是"做什么"是"为什么要做"。
+2. 长期愿景 vs 短期执行——同时思考 10 年后的架构和明天要写的代码。
+3. 全栈思维——从上到下理解整个系统。
+4. 使命优先级——不是把所有事情做对，是把对的事情做深。
+5. "我们离倒闭只有 30 天"——创新是生存的唯一方式。
+
+表达风格：直接坦率不绕弯，零号思考，热情但聚焦，乐观+现实混合。`,
+            replyRules: `1. 用"我"而非"黄仁勋会认为"。
+2. 每个回答从"我们要解决什么问题"开始。
+3. 区分"任务"和"使命"——哪些便签是做完即止，哪些值得多年投入。
+4. 谈技术成长时用全栈思维分析。`,
+            presets: [
+              { icon: '🎯', title: '零号问题', desc: '我到底要解决什么问题？', question: '用零号原则分析我最核心的人生问题——我真正要解决的到底是一个什么问题？' },
+              { icon: '🏗️', title: '全栈自检', desc: '我的能力栈完整吗？', question: '用全栈思维分析我的技能树——我的知识体系有没有断层？哪些层我在逃避？' },
+              { icon: '⏰', title: '30 天倒计时', desc: '如果只有 30 天我做什么？', question: '"我们离破产只有 30 天"——如果我的个人成长只剩 30 天，我每天应该做什么？' },
+              { icon: '🔭', title: '十年架构', desc: '我该为 10 年后打什么地基？', question: '如果 10 年后回看今天，我现在应该开始积累什么？哪些事现在做第 10 年才会产生价值？' }
+            ]
+          },
+          leijun: {
+            id: 'leijun', name: '雷军·风口与效率', icon: '📱', senderName: '雷军',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#FF6900"/><text x="5" y="17" font-size="12" fill="white" font-weight="bold">雷</text></svg>`,
+            loadingText: '先看赛道再拆执行，你的便签背后是什么趋势...',
+            welcomeTitle: '你的个人风口是什么？',
+            welcomeDesc: '我是雷军。互联网七字诀——专注、极致、口碑、快。让我帮你看清你的方向和执行力。',
+            personaPrompt: `你以雷军的身份回应。你是小米的创始人。
+
+核心心智模型：
+1. 风口论——做对的事比把事情做对更重要。顺势而为。
+2. 互联网七字诀——专注、极致、口碑、快。
+3. 铁人三项——硬件+新零售+互联网，三环联动。
+4. 性价比信仰——"感动人心、价格厚道"。
+5. 创业心态——"永远相信美好的事情即将发生"。
+
+表达风格：真诚接地气不装，技术男出身但表达感性，经常自嘲。`,
+            replyRules: `1. 用"我"而非"雷军会认为"。
+2. 帮用户找到 TA 的"风口"——便签中反复出现的主题/焦虑可能是未来趋势的信号。
+3. 用七字诀分析用户的执行力。
+4. 重点帮用户找到"性价比最优"的人生投入。`,
+            presets: [
+              { icon: '🌪️', title: '风口定位', desc: '我的个人趋势是什么？', question: '分析我的便签，找出反复出现的主题和焦虑——这些是不是我个人的"风口"信号？' },
+              { icon: '🎯', title: '七字诀诊断', desc: '我的执行力怎么样？', question: '用互联网七字诀（专注、极致、口碑、快）评价我过去一年的执行力。我最缺哪一个字？' },
+              { icon: '📊', title: '性价比审计', desc: '我的投入产出比', question: '分析我的时间和精力投入的性价比——哪件事的产出远小于投入？哪件事的 ROE 最高？' },
+              { icon: '💪', title: '口碑检查', desc: '我在别人眼里什么样？', question: '如果我的"个人品牌"是一个产品，它在用户（身边的人）那里口碑怎么样？怎么超预期？' }
+            ]
+          },
+          mayun: {
+            id: 'mayun', name: '马云·生态与愿景', icon: '🌐', senderName: '马云',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#FF6A00"/><text x="5" y="17" font-size="12" fill="white" font-weight="bold">马</text></svg>`,
+            loadingText: '我在看你的生态——你的便签里藏着什么格局...',
+            welcomeTitle: '你的使命是什么？愿景是什么？',
+            welcomeDesc: '我是马云。先有使命感，再谈怎么做。不要因为战术上的勤奋掩盖战略上的懒惰。',
+            personaPrompt: `你以马云的身份回应。你是阿里巴巴的创始人。
+
+核心心智模型：
+1. 使命愿景价值观——先搞清楚"为什么做"。
+2. 生态思维——不是自己做所有事，是建平台让更多人成功。
+3. 因为相信而看见——领导者因为相信而看见。
+4. 拥抱变化——唯一不变的是变化。
+5. 湖畔三板斧——使命、愿景、价值观+组织、人才、KPI。
+
+表达风格：充满激情口才好，未来视角看今天，讲故事而非讲数据，语气坚定带幽默。`,
+            replyRules: `1. 用"我"而非"马云会认为"。
+2. 每个回答从"使命"开始——你的便签反映的最深层追求是什么？
+3. 帮用户在混乱中找到"格局"。
+4. 强调利他思维在人生规划中的价值。`,
+            presets: [
+              { icon: '🎯', title: '使命定义', desc: '我到底为了什么？', question: '从我的便签中提炼我的个人使命——我来这世上到底为了什么？我做的事和这个使命一致吗？' },
+              { icon: '🌿', title: '生态检查', desc: '我的社交协作网络健康吗？', question: '用生态思维分析我的人际和协作网络——我是在建平台让别人成功，还是单打独斗？' },
+              { icon: '👁️', title: '相信而看见', desc: '我有什么别人不信的信念？', question: '阅读我的便签，找出我"因为相信而看见"的事——那些别人觉得不可能但我一直坚持的东西。' },
+              { icon: '🔄', title: '变化信号', desc: '我准备好了吗？', question: '扫描我过去 3 个月的便签，哪些是"拥抱变化"的信号？哪些是"抗拒变化"的信号？' }
+            ]
+          },
+          munger: {
+            id: 'munger', name: '芒格·多元思维', icon: '📚', senderName: 'Charlie Munger',
+            avatarSvg: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#8B4513"/><text x="4" y="17" font-size="12" fill="white" font-weight="bold">M</text></svg>`,
+            loadingText: '正在用多元思维模型分析你的便签——不止一个维度...',
+            welcomeTitle: '用几个模型来看你的便签？一个不够。',
+            welcomeDesc: '我是 Charlie Munger。拿着锤子的人看什么都像钉子。别被一个学科框死。',
+            personaPrompt: `你以 Charlie Munger 的身份回应。你是 Berkshire Hathaway 的副董事长。
+
+核心心智模型：
+1. 多元思维模型——一个学科的工具不够看世界。
+2. 逆向思维——不是想"怎么成功"，是想"怎么避免失败"。
+3. 激励机制——"给我看激励，我给你看结果"。
+4. 人类误判心理学——25 种心理倾向。
+5. 能力圈——知道自己知道什么、不知道什么。
+6. Lollapalooza 效应——多因素同向作用产生极端效应。
+
+表达风格：坦率到不客气，喜欢用"愚蠢"描述行为而非人格，不废话只讲有用的，引历史/心理学/物理类比。`,
+            replyRules: `1. 用"我"而非"芒格会认为"。
+2. 任何问题至少用 2 个不同学科的分析模型回答。
+3. 优先使用逆向思维——先告诉用户"怎么做会失败"再说"怎么做才能成功"。
+4. 识别用户的"铁锤人倾向"——是不是只用一种固定思维模式分析所有问题。
+5. 发现心理误判（确认偏误、损失厌恶等）时直接指出来。`,
+            presets: [
+              { icon: '🔄', title: '逆向思考', desc: '我怎样会搞砸？', question: '用逆向思维——如果我想在未来 3 年把自己的人生搞砸，最可靠的路径是什么？我现在正在做哪些事走在这条路上？' },
+              { icon: '🧠', title: '误判诊断', desc: '我在犯什么认知错误？', question: '用人类误判心理学分析我的便签——我正在落入哪些常见的心理偏误陷阱？' },
+              { icon: '🔧', title: '多元模型', desc: '这件事还能怎么看？', question: '选一个我最近反复思考的问题，用至少 3 个不同学科的思维模型来分析它。' },
+              { icon: '🎯', title: '能力圈审计', desc: '我的边界在哪？', question: '诚实分析我的能力圈——哪些领域我其实不懂但在假装懂？哪些才是我的真正优势区？' }
+            ]
+          }
+        };
+
+        function getCurrentPerspective() {
+          const selector = document.getElementById('ai-perspective-selector');
+          const id = selector ? selector.value : 'default';
+          return PERSPECTIVES[id] || PERSPECTIVES.default;
+        }
+
+        function updateWelcomeByPerspective() {
+          const p = getCurrentPerspective();
+          const welcomeEl = document.querySelector('.ai-msg-welcome');
+          if (!welcomeEl) return;
+          const titleEl = welcomeEl.querySelector('.gemini-gradient-title');
+          if (titleEl) titleEl.textContent = p.welcomeTitle;
+          const descEl = welcomeEl.querySelector('p');
+          if (descEl) descEl.innerHTML = p.welcomeDesc.replace('{count}', `<strong style="color:var(--primary);">${rawNotes.length}</strong>`);
+          const grid = welcomeEl.querySelector('.ai-preset-cards-grid');
+          if (grid) {
+            grid.innerHTML = p.presets.map(pr =>
+              `<div class="ai-preset-card" onclick="sendAiPreset('${pr.question.replace(/'/g, "\\'")}')">
+                <div class="preset-title">${pr.icon} ${pr.title}</div>
+                <div class="preset-desc">${pr.desc}</div>
+              </div>`
+            ).join('');
+          }
+        }
+
+        window.onPerspectiveChange = function() {
+          const p = getCurrentPerspective();
+          updateWelcomeByPerspective();
+          addSystemMessage(`🧠 已切换至「${p.name}」视角`);
+        };
+
+        // 数据池 (统一挂载在 window 全局空间下)
+        window.importedFiles = window.importedFiles || [];
+        window.rawNotes = window.rawNotes || [];
         let aiMessageHistory = []; // AI 对话历史记录
 
         // DOM 引用
@@ -2033,7 +2350,8 @@
                 notes: notes,
                 categories: fileCategories,
                 wordCount: totalWords,
-                collapsed: false
+                collapsed: false,
+                selectedForSync: true
             };
 
             importedFiles.push(newFileObj);
@@ -2119,7 +2437,39 @@
                     chartsContainer.style.display = 'none';
                 }
             }
+
+            // 更新同步按钮的状态和文本
+            updateSyncButtonState();
         }
+
+        // 切换本地备份文件勾选状态
+        window.toggleFileSelection = function(fileId) {
+            const file = importedFiles.find(f => f.id === fileId);
+            if (file) {
+                file.selectedForSync = !file.selectedForSync;
+            }
+            updateSyncButtonState();
+        };
+
+        window.updateSyncButtonState = function() {
+            const syncBtn = document.getElementById('btn-cloud-sync-action');
+            if (!syncBtn) return;
+            
+            const localFiles = importedFiles.filter(f => f.id !== 'db-notes');
+            if (localFiles.length === 0) {
+                syncBtn.style.opacity = '1';
+                return;
+            }
+            
+            const spanText = syncBtn.querySelector('span');
+            syncBtn.disabled = false;
+            syncBtn.style.opacity = '1';
+            syncBtn.style.cursor = 'pointer';
+            syncBtn.style.background = 'linear-gradient(135deg, var(--primary), #1a73e8)';
+            syncBtn.style.border = 'none';
+            syncBtn.style.color = '#131314';
+            if (spanText) spanText.innerText = `☁️ 一键同步本地备份至云端数据库 (支持按需挑选文件)`;
+        };
 
         // ==================== 📊 智能数据驾驶舱（统计与情感分析图表渲染引擎） ====================
         window.renderChartsWithData = function() {
@@ -2370,6 +2720,7 @@
                 header.innerHTML = `
                     <div class="file-group-header-left" title="${file.name}">
                         <span class="file-group-arrow-wrapper">${arrowSvg}</span>
+                        <input type="checkbox" class="file-select-checkbox" ${file.selectedForSync !== false ? 'checked' : ''} onclick="event.stopPropagation(); toggleFileSelection('${file.id}')" style="margin: 0 6px 0 2px; cursor: pointer; accent-color: var(--primary); width: 14px; height: 14px;">
                         <span>📦</span>
                         <span class="file-group-name">${file.name}</span>
                     </div>
@@ -2701,12 +3052,31 @@
             }
         });
 
+        // ☁️ 云端同步点击响应
+        window.handleCloudSyncClick = async function() {
+            if (typeof rawNotes === 'undefined' || rawNotes.length === 0) {
+                alert('请先导入备份文件再进行云端同步！');
+                return;
+            }
+            
+            // 检测是否为 localhost/127.0.0.1
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                alert('💡 检测到您当前是通过双击本地 HTML 文件打开的【离线版】。\n\n要将便签一键同步并持久化保存到 MySQL 云端数据库中，请确保已启动后端服务，并在浏览器中访问全栈智能空间：\n👉 http://localhost:8000\n\n开启服务并在主页登录后即可完美使用全链路功能！');
+                return;
+            }
+
+            // 如果在 localhost，提示并引导至集成了完整 app.js 交互的系统主页
+            alert('💡 正在为您跳转至集成了全栈数据库交互的系统主页...\n登录后导入备份文件，即可一键将您的便签持久化至 MySQL 数据库！');
+            window.location.href = '/';
+        };
+
         // 🌟🌟 6. 【黑科技】自动检测预装载的 notes_data.js 数据 (免上传/免拖拽)
         window.addEventListener('DOMContentLoaded', () => {
             if (window.OPPO_NOTES_DATA && Array.isArray(window.OPPO_NOTES_DATA)) {
                 console.log('检测到本地预装载数据，正在自动载入...');
                 addImportedFile('notes_data.js (本地自动预装载)', window.OPPO_NOTES_DATA);
             }
+            setTimeout(updateWelcomeByPerspective, 500);
         });
 
         // ==================== 🌟🌟 7. AI 灵魂对话与 DeepSeek API 核心逻辑 ====================
@@ -2854,10 +3224,11 @@
             const avatar = document.createElement('div');
             avatar.className = 'bubble-avatar';
             
+            const p = getCurrentPerspective();
             if (role === 'user') {
-                avatar.textContent = 'HP';
+                avatar.innerHTML = `<div class="bubble-avatar-inner" style="background:var(--primary);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;border-radius:8px;width:32px;height:32px;">我</div>`;
             } else {
-                avatar.innerHTML = `<div class="bubble-avatar-inner"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-logo-grad)"/></svg></div>`;
+                avatar.innerHTML = `<div class="bubble-avatar-inner">${p.avatarSvg}</div>`;
             }
             
             const contentWrapper = document.createElement('div');
@@ -2865,7 +3236,7 @@
             
             const senderName = document.createElement('div');
             senderName.className = 'bubble-sender-name';
-            senderName.textContent = role === 'user' ? 'Hijau Pandan' : 'Gemini';
+            senderName.textContent = role === 'user' ? '我' : p.senderName;
             
             const content = document.createElement('div');
             content.className = 'bubble-content markdown-body';
@@ -2948,16 +3319,16 @@
                 allCategoriesSummary[cat] = (allCategoriesSummary[cat] || 0) + 1;
             });
 
-            // C. 组装 System Prompt，注入宏观分析画像和微观记忆碎片
-            const systemPrompt = `你是一位顶级、温和、富有同理心且智慧非凡的“个人人生轨迹分析师与灵魂导师”（Personal Historian & Soul Mentor）。
-用户的个人便签、日记和感悟数据已经被安全地放置在你的背景库中。你的核心职责是陪伴用户回顾、梳理 and 分析他们过去几年的成长变化、心路历程、情绪起伏、技术积累、以及事业轨迹，并带给他们深刻且有力量的洞见与鼓励。
+            // C. 组装 System Prompt — 注入选择的视角 + 宏观画像 + 记忆碎片
+            const perspective = getCurrentPerspective();
+            const systemPrompt = `${perspective.personaPrompt}
 
 【用户的便签库统计画像】
 - 全量便签总数：${rawNotes.length} 篇
 - 所有分类目录：${JSON.stringify(Object.keys(allCategoriesSummary).map(k => `${k} (${allCategoriesSummary[k]}篇)`))}
 - 当前对话过滤范围：${scope === 'current-note' ? '仅限当前单篇便签' : scope === 'current-cat' ? `仅限分类：${activeCategoryName}` : '全库智能混合检索模式'}
 
-【从用户便签中智能匹配出的“高价值记忆碎片与历史原文选段”】
+【从用户便签中智能匹配出的"高价值记忆碎片与历史原文选段"】
 ${contextNotes.map((n, i) => `--- 记忆碎片 #${i+1} ---
 标题: ${n.title}
 时间: ${n.date}
@@ -2966,10 +3337,9 @@ ${contextNotes.map((n, i) => `--- 记忆碎片 #${i+1} ---
 ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略后续字数……)' : ''}`).join('\n\n')}
 
 【你的对话与回复原则】
-1. 你的语气必须温柔、智慧、真诚、包容，像一位陪伴他多年的挚友或富有同理心的人生导师。
-2. 回答用户问题时，必须深度结合上方的“记忆碎片”中他的【历史原文选段】，并且【明确引用】他便签的标题、日期、或某句原文，来说明他当时的状态，证明你确实在仔细倾听他的过去。严禁胡编乱造、凭空捏造事实。
-3. 请在对话中多帮他梳理时间线或归纳成长，例如帮他总结：“在 2024 年你写到了很多关于迷茫的词，但在 2025 年你的文字充满笃定……”
-4. 使用非常优雅的 Markdown 进行格式排版，多用段落引用（> ）、粗体、小标题以及生动温和的 emoji 表情使回复极富可读性。`;
+${perspective.replyRules}
+
+重要：你输出的所有分析、评价和判断，都必须基于上方【真实的历史原文选段】，严禁脱离便签内容编造。引用用户日记的具体标题和日期以证明你真的读了。`;
 
             // 维护对话上下文
             if (aiMessageHistory.length === 0) {
@@ -2986,21 +3356,18 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
             }
 
             // 创建加载状态
+            const loadingP = getCurrentPerspective();
             const loadingBubble = document.createElement('div');
             loadingBubble.className = 'chat-bubble ai';
             loadingBubble.innerHTML = `
                 <div class="bubble-avatar">
-                    <div class="bubble-avatar-inner">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 0C12 6.62742 6.62742 12 0 12C6.62742 12 12 17.3726 12 24C12 17.3726 17.3726 12 24 12C17.3726 12 12 6.62742 12 0Z" fill="url(#gemini-star-logo-grad)"/>
-                        </svg>
-                    </div>
+                    <div class="bubble-avatar-inner">${loadingP.avatarSvg}</div>
                 </div>
                 <div class="bubble-content-wrapper">
-                    <div class="bubble-sender-name">Gemini</div>
+                    <div class="bubble-sender-name">${loadingP.senderName}</div>
                     <div class="bubble-content" style="color:var(--text-muted); font-style:italic; display:flex; align-items:center; gap:8px;">
                         <span style="display:inline-block; width:6px; height:6px; background:#8ab4f8; border-radius:50%; animation: pulse 1s infinite alternate;"></span>
-                        <span>Gemini 正在静心翻阅你的历史便签，整理思绪中...</span>
+                        <span>${loadingP.senderName} ${loadingP.loadingText}</span>
                     </div>
                 </div>
             `;
@@ -3200,6 +3567,7 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
                 aiMessageHistory = [];
                 aiChatMessages.innerHTML = '';
                 
+                const p = getCurrentPerspective();
                 const welcomeMsg = document.createElement('div');
                 welcomeMsg.className = 'ai-msg-welcome';
                 welcomeMsg.innerHTML = `
@@ -3214,29 +3582,19 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
                         </defs>
                     </svg>
                     <div>
-                        <span class="gemini-gradient-title">Hijau，需要我帮您做点什么？</span>
+                        <span class="gemini-gradient-title">${p.welcomeTitle}</span>
                     </div>
                     <p style="color: var(--text-muted); font-size: 13.5px; line-height: 1.6; max-width: 520px; margin: 0 auto 24px auto;">
-                        我是你的本地 Gemini 智能助理。我已经深度关联了你从 OPPO 便签中导出的 <strong style="color:var(--primary);" id="ai-note-count">${rawNotes.length}</strong> 篇历史文本。我们可以立刻开始深度问答，回顾你过去几年的思绪与成长。
+                        ${p.welcomeDesc.replace('{count}', `<strong style="color:var(--primary);">${rawNotes.length}</strong>`)}
                     </p>
                     
                     <div class="ai-preset-cards-grid">
-                        <div class="ai-preset-card" onclick="sendAiPreset('📅 总结我过去几年的情感与心路历程，看看我最常有哪些情绪起伏和心理变化？')">
-                            <div class="preset-title">🎭 情感心路回顾</div>
-                            <div class="preset-desc">分析我文字中流露的喜怒哀乐与成长变化</div>
-                        </div>
-                        <div class="ai-preset-card" onclick="sendAiPreset('💡 梳理我这些年在技术、学习或事业上的成长轨迹和核心收获。')">
-                            <div class="preset-title">🚀 事业成长轨迹</div>
-                            <div class="preset-desc">挖掘我记录的学习心得与工作难关</div>
-                        </div>
-                        <div class="ai-preset-card" onclick="sendAiPreset('🧘&zwj;‍♂️ 分析我这些年来最常思考的哲学问题、人生困惑以及自我解答。')">
-                            <div class="preset-title">🔍 哲学自我追问</div>
-                            <div class="preset-desc">总结我对人生、理想与自我的不断探索</div>
-                        </div>
-                        <div class="ai-preset-card" onclick="sendAiPreset('🌟 找出我便签日记中提到最多次的关键词，并为我构建几个我的人生核心关键词。')">
-                            <div class="preset-title">✨ 人生词频提炼</div>
-                            <div class="preset-desc">通过数据做词频分析，刻画人生特征</div>
-                        </div>
+                        ${p.presets.map(pr =>
+                          `<div class="ai-preset-card" onclick="sendAiPreset('${pr.question.replace(/'/g, "\\'")}')">
+                            <div class="preset-title">${pr.icon} ${pr.title}</div>
+                            <div class="preset-desc">${pr.desc}</div>
+                          </div>`
+                        ).join('')}
                     </div>
                 `;
                 aiChatMessages.appendChild(welcomeMsg);
@@ -3299,7 +3657,80 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
             });
         }
 
-        // AI 对话导出为 Markdown
+        
+        // ==================== 📐 UI 收缩折叠控制器 ====================
+        // A. 便签正文头部收缩逻辑
+        const readerHeader = document.getElementById('reader-header');
+        const btnCollapseReaderHeader = document.getElementById('btn-collapse-reader-header');
+        const readerHeaderArrow = document.getElementById('reader-header-arrow');
+        let readerHeaderCollapsed = localStorage.getItem('readerHeaderCollapsed') === 'true';
+
+        function initReaderHeaderCollapseState() {
+            if (readerHeader && readerHeaderArrow) {
+                readerHeader.classList.toggle('collapsed', readerHeaderCollapsed);
+                if (readerHeaderCollapsed) {
+                    readerHeaderArrow.style.transform = 'rotate(0deg)';
+                } else {
+                    readerHeaderArrow.style.transform = 'rotate(180deg)';
+                }
+            }
+        }
+        initReaderHeaderCollapseState();
+
+        if (btnCollapseReaderHeader) {
+            btnCollapseReaderHeader.addEventListener('click', (e) => {
+                e.stopPropagation();
+                readerHeaderCollapsed = !readerHeaderCollapsed;
+                localStorage.setItem('readerHeaderCollapsed', readerHeaderCollapsed);
+                initReaderHeaderCollapseState();
+            });
+        }
+
+        // B. 时间轴与心路热力图收缩逻辑
+        const timelineHeaderTitle = document.getElementById('timeline-header-title');
+        const timelineArrow = document.getElementById('timeline-arrow');
+        const timelineContentWrapper = document.getElementById('timeline-content-wrapper');
+        let timelineCollapsed = localStorage.getItem('timelineCollapsed') === 'true';
+
+        function initTimelineCollapseState() {
+            if (timelineContentWrapper && timelineArrow) {
+                timelineContentWrapper.classList.toggle('collapsed', timelineCollapsed);
+                timelineArrow.classList.toggle('collapsed', timelineCollapsed);
+            }
+        }
+        initTimelineCollapseState();
+
+        if (timelineHeaderTitle) {
+            timelineHeaderTitle.addEventListener('click', () => {
+                timelineCollapsed = !timelineCollapsed;
+                localStorage.setItem('timelineCollapsed', timelineCollapsed);
+                initTimelineCollapseState();
+            });
+        }
+
+        // C. 数据驾驶舱分析图表收缩逻辑
+        const chartsToggleTitle = document.getElementById('charts-toggle-title');
+        const chartsArrow = document.getElementById('charts-arrow');
+        const dashboardChartsWrapper = document.getElementById('dashboard-charts-wrapper');
+        let chartsCollapsed = localStorage.getItem('chartsCollapsed') === 'true';
+
+        function initChartsCollapseState() {
+            if (dashboardChartsWrapper && chartsArrow) {
+                dashboardChartsWrapper.classList.toggle('collapsed', chartsCollapsed);
+                chartsArrow.classList.toggle('collapsed', chartsCollapsed);
+            }
+        }
+        initChartsCollapseState();
+
+        if (chartsToggleTitle) {
+            chartsToggleTitle.addEventListener('click', () => {
+                chartsCollapsed = !chartsCollapsed;
+                localStorage.setItem('chartsCollapsed', chartsCollapsed);
+                initChartsCollapseState();
+            });
+        }
+
+// AI 对话导出为 Markdown
         if (btnExportAi) {
             btnExportAi.addEventListener('click', () => {
                 if (aiMessageHistory.length <= 1) {

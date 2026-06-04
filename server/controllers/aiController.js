@@ -16,7 +16,8 @@ export async function chatStream(req, res) {
     currentNoteId = null,
     currentCategory = null,
     customApiKey = '',
-    customApiUrl = ''
+    customApiUrl = '',
+    systemInstruction: clientSystemInstruction = ''
   } = req.body;
 
   // Set SSE Headers
@@ -32,7 +33,7 @@ export async function chatStream(req, res) {
   try {
     // 1. Gather RAG Context
     let memoryFragments = [];
-    let systemInstruction = "你是一个能够共情的个人知识助理和灵魂伴侣。基于用户的便签进行辅助回答。";
+    let systemInstruction = clientSystemInstruction || "你是一个能够共情的个人知识助理和灵魂伴侣。基于用户的便签进行辅助回答。";
 
     // Extract last user message to use as search query
     const userMessages = messages.filter(m => m.role === 'user');
@@ -56,10 +57,10 @@ export async function chatStream(req, res) {
       // MySQL native full-text search RAG with Chinese ngram parser!
       let ftsRes = await query(
         `SELECT title, LEFT(content, 1000) as snippet,
-                MATCH(title, content) AGAINST($2 IN BOOLEAN MODE) as rank
+                MATCH(title, content) AGAINST($2 IN BOOLEAN MODE) as \`rank\`
          FROM notes
          WHERE user_id = $1 AND is_deleted = FALSE AND MATCH(title, content) AGAINST($2 IN BOOLEAN MODE)
-         ORDER BY rank DESC LIMIT 6`,
+         ORDER BY \`rank\` DESC LIMIT 6`,
         [userId, searchQuery]
       );
       
@@ -88,33 +89,54 @@ export async function chatStream(req, res) {
     const isGemini = model.startsWith('gemini');
 
     if (isGemini) {
-      // --- Google Gemini Streaming Integration ---
+      // --- Google Gemini Streaming Integration (SSE mode) ---
       const apiKey = customApiKey || DEFAULT_GEMINI_KEY;
-      const targetModel = model; // e.g. gemini-2.5-flash
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?key=${apiKey}`;
+      if (!apiKey) throw new Error('未配置 Gemini API Key，请在设置中填写或联系管理员。');
+      
+      const targetModel = model; // e.g. gemini-2.5-flash-preview-05-20
+      // Use alt=sse for standard SSE streaming - much cleaner to parse
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
-      // Convert messages to Gemini's format
-      const contents = messages.map(msg => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      }));
+      // Convert messages to Gemini's format (filter empty messages)
+      const contents = messages
+        .filter(msg => msg.content && msg.content.trim())
+        .map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        }));
+
+      // Ensure at least one message
+      if (contents.length === 0) {
+        throw new Error('消息内容为空，无法发送请求');
+      }
 
       const bodyPayload = {
         contents,
         systemInstruction: {
           parts: [{ text: systemInstruction }]
+        },
+        generationConfig: {
+          temperature: 0.9,
+          topP: 0.95,
+          maxOutputTokens: 8192
         }
       };
+
+      const abortController = new AbortController();
+      req.on('close', () => abortController.abort());
 
       const response = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload)
+        body: JSON.stringify(bodyPayload),
+        signal: abortController.signal
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`Gemini Stream Error (${response.status}): ${errText}`);
+        const sanitized = `AI 服务响应异常 (${response.status})`;
+        console.error(`Gemini API error: ${response.status} ${errText.substring(0, 200)}`);
+        throw new Error(sanitized);
       }
 
       const reader = response.body.getReader();
@@ -127,37 +149,30 @@ export async function chatStream(req, res) {
 
         buffer += decoder.decode(value, { stream: true });
         
-        // Gemini returns JSON array chunks in streaming sometimes or clean JSON objects.
-        // We'll parse the buffer by searching for completed JSON blocks or splitting by newlines
-        let boundary = buffer.indexOf('\n');
-        while (boundary !== -1) {
-          const chunkStr = buffer.substring(0, boundary).trim();
-          buffer = buffer.substring(boundary + 1);
-          boundary = buffer.indexOf('\n');
+        // SSE format: each event is "data: {json}\n\n"
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete last line
 
-          if (chunkStr) {
-            try {
-              // Clean the comma/bracket prefix for stream chunks
-              let cleanStr = chunkStr;
-              if (cleanStr.startsWith(',')) cleanStr = cleanStr.substring(1);
-              if (cleanStr.startsWith('[')) cleanStr = cleanStr.substring(1);
-              if (cleanStr.endsWith(']')) cleanStr = cleanStr.substring(0, cleanStr.length - 1);
-              
-              cleanStr = cleanStr.trim();
-              if (!cleanStr) continue;
-
-              const chunkObj = JSON.parse(cleanStr);
-              const text = chunkObj.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              if (text) {
-                sendEvent('chunk', { content: text });
-              }
-            } catch (e) {
-              // Fragmentary json, skip and wait for more data
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          
+          const jsonStr = trimmed.substring(6);
+          if (jsonStr === '[DONE]') continue;
+          
+          try {
+            const chunkObj = JSON.parse(jsonStr);
+            const text = chunkObj.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (text) {
+              sendEvent('chunk', { content: text });
             }
+          } catch (e) {
+            // Incomplete JSON fragment, skip
           }
         }
       }
       sendEvent('done', {});
+
     } else {
       // --- DeepSeek Streaming Integration ---
       const apiKey = customApiKey || DEFAULT_DEEPSEEK_KEY;
@@ -172,18 +187,26 @@ export async function chatStream(req, res) {
         stream: true
       };
 
+      const abortController = new AbortController();
+      if (!req.destroyed) {
+        req.on('close', () => abortController.abort());
+      }
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify(bodyPayload)
+        body: JSON.stringify(bodyPayload),
+        signal: abortController.signal
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`DeepSeek Stream Error (${response.status}): ${errText}`);
+        const sanitized = `AI 服务响应异常 (${response.status})`;
+        console.error(`DeepSeek API error: ${response.status} ${errText.substring(0, 200)}`);
+        throw new Error(sanitized);
       }
 
       const reader = response.body.getReader();

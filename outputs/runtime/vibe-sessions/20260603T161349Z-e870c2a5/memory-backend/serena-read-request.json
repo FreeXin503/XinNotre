@@ -1,0 +1,22 @@
+{
+    "lane":  "serena",
+    "stage":  "xl_plan",
+    "task":  "continue-vibe optimize frontend UI, make layout more spacious, add collapsible sections deliverable-governed-implementation-artifacts-verification-evidence-and-clea constraint-do-not-bypass-the-fixed-six-stage-governed-runtime constraint-do-not-widen-scope-silently-beyond-the-frozen-requirement-docume Continue with approved requirement. Optimize the frontend UI: make layout more spacious, add collapsible sections for sidebar, note list, and file groups. Improve spacing, padding, and breathing room across all views.",
+    "top_k":  3,
+    "max_chars_per_item":  240,
+    "keywords":  [
+                     "continue-vibe",
+                     "optimize",
+                     "frontend",
+                     "make",
+                     "layout",
+                     "more",
+                     "spacious",
+                     "add",
+                     "collapsible",
+                     "sections",
+                     "deliverable-governed-implementation-artifacts-verification-evidence-and-clea",
+                     "constraint-do-not-bypass-the-fixed-six-stage-governed-runtime"
+                 ],
+    "project_key_source":  null
+}

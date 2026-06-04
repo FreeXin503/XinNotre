@@ -1,0 +1,17 @@
+{
+    "stage":  "skeleton_check",
+    "owner":  "state_store",
+    "status":  "fallback_local_digest",
+    "generated_at":  "2026-06-04T02:59:05Z",
+    "source_receipt_path":  "E:\\GzrjxyGzrjxyGzrjxyGzrjxy\\Project documents for all departments\\AInything\\OPPO便签导出系统\\outputs\\runtime\\vibe-sessions\\20260604T025902Z-bac36f6f\\skeleton-receipt.json",
+    "items":  [
+                  "Task focus: Fix frontend JS errors in index.html and preview.html. Redesign the dark theme to use deep blue/navy tones instead of slate gray. Make the UI feel dark blue and immersive.",
+                  "Git branch: ",
+                  "All required governed runtime prerequisite paths are present."
+              ],
+    "budget":  {
+                   "top_k":  3,
+                   "max_tokens":  96,
+                   "max_chars_per_item":  220
+               }
+}

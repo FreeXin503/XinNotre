@@ -196,5 +196,15 @@ export const ApiClient = {
     }).catch(err => {
       onError(err);
     });
+  },
+
+  async getSkills() {
+    const res = await fetch(`${API_BASE}/skills`, {
+      method: 'GET',
+      headers: this.getHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '获取技能列表失败');
+    return data;
   }
 };

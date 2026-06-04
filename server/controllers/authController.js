@@ -2,12 +2,18 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../config/database.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'xinnote_super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export async function register(req, res) {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
+  }
+  if (typeof username !== 'string' || username.length < 2 || username.length > 50) {
+    return res.status(400).json({ error: 'Username must be 2-50 characters' });
+  }
+  if (typeof password !== 'string' || password.length < 4 || password.length > 128) {
+    return res.status(400).json({ error: 'Password must be 4-128 characters' });
   }
 
   try {
@@ -41,6 +47,9 @@ export async function login(req, res) {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
+  }
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Invalid input type' });
   }
 
   try {

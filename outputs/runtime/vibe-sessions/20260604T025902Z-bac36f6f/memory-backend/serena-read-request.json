@@ -1,0 +1,22 @@
+{
+    "lane":  "serena",
+    "stage":  "deep_interview",
+    "task":  "Fix frontend JS errors in index.html and preview.html. Redesign the dark theme to use deep blue/navy tones instead of slate gray. Make the UI feel dark blue and immersive.",
+    "top_k":  3,
+    "max_chars_per_item":  240,
+    "keywords":  [
+                     "fix",
+                     "frontend",
+                     "errors",
+                     "index",
+                     "html",
+                     "and",
+                     "preview",
+                     "redesign",
+                     "the",
+                     "dark",
+                     "theme",
+                     "use"
+                 ],
+    "project_key_source":  null
+}

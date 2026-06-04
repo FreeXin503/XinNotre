@@ -12,7 +12,7 @@ dotenv.config();
 
 // Default configurations
 const dbUser = process.env.DB_USER || 'root';
-const dbPassword = process.env.DB_PASSWORD || 'czx503CZX';
+const dbPassword = process.env.DB_PASSWORD || '';
 const dbHost = process.env.DB_HOST || 'localhost';
 const dbPort = process.env.DB_PORT || 3306;
 const dbName = process.env.DB_NAME || 'xinnote_db';
@@ -73,7 +73,9 @@ export async function initDatabase() {
       await pool.query(`ALTER TABLE notes ADD FULLTEXT INDEX notes_fts_idx (title, content) WITH PARSER ngram`);
       console.log('✅ Fulltext index added successfully!');
     } catch (indexErr) {
-      // index already exists, normal
+      if (indexErr.errno !== 1061) { // 1061 = duplicate key, index already exists
+        console.warn('⚠️ Fulltext index creation warning:', indexErr.message);
+      }
     }
 
     console.log('✅ Migrations applied successfully!');
@@ -84,7 +86,14 @@ export async function initDatabase() {
 }
 
 // Standard query wrapper
-export const query = async (text, params) => {
+export async function closePool() {
+  if (pool) {
+    await pool.end();
+    console.log('✅ MySQL connection pool closed');
+  }
+}
+
+export const query = async (text, params = []) => {
   if (!pool) {
     pool = mysql.createPool({
       host: dbHost,
@@ -99,19 +108,21 @@ export const query = async (text, params) => {
   }
   
   // Convert Postgres style $1, $2 placeholders to MySQL style ? placeholders
-  let mysqlQuery = text;
-  let matches = text.match(/\$\d+/g);
-  if (matches) {
-    // Sort matches descending to avoid replacing $10 before $1
-    const uniqueMatches = Array.from(new Set(matches)).sort((a, b) => {
-      return parseInt(b.substring(1)) - parseInt(a.substring(1));
-    });
-    
-    for (const match of uniqueMatches) {
-      mysqlQuery = mysqlQuery.replaceAll(match, '?');
-    }
+  // and construct the matching parameters array to align with the order of ?
+  let mysqlQuery = '';
+  const newParams = [];
+  const placeholderRegex = /\$(\d+)/g;
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = placeholderRegex.exec(text)) !== null) {
+    mysqlQuery += text.substring(lastIndex, match.index) + '?';
+    const paramNum = parseInt(match[1], 10);
+    newParams.push(params && params[paramNum - 1] !== undefined ? params[paramNum - 1] : null);
+    lastIndex = placeholderRegex.lastIndex;
   }
+  mysqlQuery += text.substring(lastIndex);
 
-  const [rows] = await pool.query(mysqlQuery, params);
+  const [rows] = await pool.query(mysqlQuery, newParams.length > 0 ? newParams : params);
   return { rows };
 };

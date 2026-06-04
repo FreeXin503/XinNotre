@@ -1,0 +1,17 @@
+{
+    "stage":  "skeleton_check",
+    "owner":  "state_store",
+    "status":  "fallback_local_digest",
+    "generated_at":  "2026-06-03T16:13:51Z",
+    "source_receipt_path":  "E:\\GzrjxyGzrjxyGzrjxyGzrjxy\\Project documents for all departments\\AInything\\OPPO便签导出系统\\outputs\\runtime\\vibe-sessions\\20260603T161349Z-e870c2a5\\skeleton-receipt.json",
+    "items":  [
+                  "Task focus: continue-vibe optimize frontend UI, make layout more spacious, add collapsible sections deliverable-governed-implementation-artifacts-verification-evidence-and-clea constraint-do-not-bypass-the-fixed-six-stag...",
+                  "Git branch: ",
+                  "All required governed runtime prerequisite paths are present."
+              ],
+    "budget":  {
+                   "top_k":  3,
+                   "max_tokens":  96,
+                   "max_chars_per_item":  220
+               }
+}

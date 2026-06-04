@@ -68,8 +68,11 @@ export async function getNoteDetail(req, res) {
 // Create new note
 export async function createNote(req, res) {
   const userId = req.user.id;
-  const { title = '无标题', content = '', category = '未分类' } = req.body;
+  let { title = '无标题', content = '', category = '未分类' } = req.body;
   const id = req.body.id || Math.random().toString(36).substring(2, 12);
+  title = String(title).substring(0, 500);
+  content = String(content).substring(0, 100000);
+  category = String(category).substring(0, 100);
   const wordCount = content.length;
 
   try {
@@ -90,7 +93,10 @@ export async function createNote(req, res) {
 export async function updateNote(req, res) {
   const { id } = req.params;
   const userId = req.user.id;
-  const { title, content, category } = req.body;
+  let { title, content, category } = req.body;
+  if (title !== undefined) title = String(title).substring(0, 500);
+  if (content !== undefined) content = String(content).substring(0, 100000);
+  if (category !== undefined) category = String(category).substring(0, 100);
 
   try {
     // 1. Fetch current note to archive its current state

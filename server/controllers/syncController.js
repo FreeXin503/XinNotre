@@ -45,8 +45,8 @@ export async function syncPush(req, res) {
         // 1. Insert new note
         await query(
           `INSERT INTO notes (id, user_id, title, content, category, word_count, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
-          [id, userId, title, content, category, wordCount, parsedDate]
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, userId, title, content, category, wordCount, parsedDate, parsedDate]
         );
         inserted++;
       } else {
@@ -78,7 +78,7 @@ export async function syncPush(req, res) {
         } else {
           // If deleted tag was true, restore it if synchronized again
           if (existing.is_deleted) {
-            await query('UPDATE notes SET is_deleted = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
+            await query('UPDATE notes SET is_deleted = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2', [id, userId]);
             updated++;
           } else {
             skipped++;

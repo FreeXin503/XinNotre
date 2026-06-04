@@ -1,0 +1,12 @@
+{
+  "host_id": "codex",
+  "entry_id": "vibe",
+  "launch_mode": "canonical-entry",
+  "launcher_path": "C:\\Users\\Zxin\\.gemini\\antigravity\\skills\\vibe\\scripts\\runtime\\Invoke-VibeCanonicalEntry.ps1",
+  "requested_stage_stop": "xl_plan",
+  "requested_grade_floor": null,
+  "runtime_entrypoint": "C:\\Users\\Zxin\\.gemini\\antigravity\\skills\\vibe\\scripts\\runtime\\invoke-vibe-runtime.ps1",
+  "run_id": "20260603T132113Z-0369b177",
+  "created_at": "2026-06-03T13:21:13Z",
+  "launch_status": "failed"
+}
