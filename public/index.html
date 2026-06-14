@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -128,8 +128,20 @@
             </div>
 
             <div class="sidebar-section-title">分类目录</div>
-            <div class="category-list" id="category-list" style="max-height: 50%; overflow-y: auto;">
+            <div class="category-list" id="category-list" style="max-height: 30%; overflow-y: auto;">
                 <!-- 动态渲染分类 -->
+            </div>
+
+            <!-- 📝 便签文件列表 -->
+            <div class="sidebar-section-title" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="window.toggleSidebarNotesList()">
+                <span>📝 便签文件</span>
+                <span id="sidebar-notes-count" style="font-size:10px; background:rgba(255,255,255,0.08); padding:1px 6px; border-radius:8px;">0</span>
+                <svg class="section-arrow" id="sidebar-notes-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s ease;">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div id="sidebar-notes-list" style="max-height: 200px; overflow-y: auto; padding: 0 12px 8px 12px; display: flex; flex-direction: column; gap: 3px;">
+                <div style="color: var(--text-muted); text-align: center; font-size: 11px; padding: 8px;">请先选择分类目录查看便签</div>
             </div>
 
             <div class="sidebar-section-title" style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
@@ -238,6 +250,10 @@
                         <div class="stat-num" id="stat-total-words">0</div>
                         <div class="stat-label">总字数估计</div>
                     </div>
+                    <div class="stat-card" id="btn-trash-view" style="cursor:pointer;">
+                        <div class="stat-num" id="stat-deleted-notes">0</div>
+                        <div class="stat-label">回收站</div>
+                    </div>
                 </div>
 
                 <!-- 可视化图表大屏 -->
@@ -279,6 +295,9 @@
                     </button>
                     <button class="btn-pack" id="btn-cloud-sync-action" onclick="if(window.syncLocalToCloud) window.syncLocalToCloud()" style="background: linear-gradient(135deg, var(--primary), #1a73e8); color: #131314; margin-top: 12px; box-shadow: 0 4px 15px rgba(26, 115, 232, 0.2);">
                         <span>☁️ 一键将导入的本地备份同步持久化至云端数据库</span>
+                    </button>
+                    <button class="btn-pack" id="btn-health-check-action" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-main); margin-top: 12px;">
+                        <span>🩺 检查云端健康状态</span>
                     </button>
                     <p style="color: var(--text-muted); font-size: 11px; margin-top: 12px; max-width: 480px; line-height: 1.5;">
                         * 采用本地纯净环境打包技术，为您在本地将 1600+ 篇便签重组为分目录的 Markdown 文件夹 ZIP，仅需 200 毫秒即可下载完成！
@@ -418,9 +437,22 @@
                             <div style="display:flex; gap:8px;" onclick="event.stopPropagation();">
                                 <button onclick="window.toggleAllMultiAgents && window.toggleAllMultiAgents(true)" style="padding:2px 8px; font-size:11px; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:#fff; cursor:pointer;">全选</button>
                                 <button onclick="window.toggleAllMultiAgents && window.toggleAllMultiAgents(false)" style="padding:2px 8px; font-size:11px; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:#fff; cursor:pointer;">清空</button>
+                                <button onclick="window.toggleMultiAgentBarFold && window.toggleMultiAgentBarFold()" title="整块收起/展开" style="padding:2px 8px; font-size:11px; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:#fff; cursor:pointer;">收起</button>
                             </div>
                         </div>
+                        <!-- 🎯 对话模式切换按钮组 -->
+                        <div id="multi-agent-mode-bar" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            <span style="font-size:11px; color:var(--text-muted);">对话模式:</span>
+                            <button class="multi-mode-btn active" data-mode="group" onclick="window.setMultiAgentMode('group')" style="padding:3px 10px; font-size:11px; border-radius:8px; background:var(--primary); border:1px solid var(--primary); color:#131314; cursor:pointer; font-weight:600; transition:all 0.2s;">👥 群聊</button>
+                            <button class="multi-mode-btn" data-mode="tab" onclick="window.setMultiAgentMode('tab')" style="padding:3px 10px; font-size:11px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:#fff; cursor:pointer; transition:all 0.2s;">📑 标签页</button>
+                            <button class="multi-mode-btn" data-mode="rotate" onclick="window.setMultiAgentMode('rotate')" style="padding:3px 10px; font-size:11px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:#fff; cursor:pointer; transition:all 0.2s;">🔄 轮流</button>
+                        </div>
                         <div id="multi-agent-checkboxes" style="display:flex; flex-wrap:wrap; gap:8px 12px;"></div>
+                    </div>
+                    <!-- 📑 多标签页模式容器 -->
+                    <div id="multi-tab-bar" style="display:none; max-width:820px; width:100%; pointer-events:auto; flex-direction:column; gap:6px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px; margin-bottom: 8px;">
+                        <div id="multi-tab-headers" style="display:flex; gap:6px; flex-wrap:wrap; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px; margin-bottom: 4px;"></div>
+                        <div id="multi-tab-contents" style="display:flex; flex-direction:column; gap:4px; max-height: 300px; overflow-y: auto;"></div>
                     </div>
 
                     <div class="gemini-pill-bar">
@@ -430,63 +462,62 @@
                         
                         <div class="pill-footer">
                             <div class="pill-left-accessories">
-                                <div class="pill-scope-selector-btn" title="选择智能检索的文本范围">
-                                    <span>🎯 范围:</span>
+                                <button id="multi-agent-fold-chip" onclick="window.toggleMultiAgentBarFold && window.toggleMultiAgentBarFold()" style="display:none; background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-main); border-radius:14px; padding:1px 7px; font-size:10.5px; cursor:pointer; white-space:nowrap; line-height:normal;">👥 联席会诊</button>
+                                <div class="pill-scope-selector-btn" title="范围: 全量便签 / 当前分类 / 当前便签">
+                                    <span>🎯</span>
                                     <select id="ai-context-scope">
-                                        <option value="all">🌍 全量便签 (智能关联)</option>
-                                        <option value="current-cat">📁 当前分类 (过滤目录)</option>
-                                        <option value="current-note">📄 当前便签 (聚焦单篇)</option>
+                                        <option value="all">全量</option>
+                                        <option value="current-cat">分类</option>
+                                        <option value="current-note">单篇</option>
                                     </select>
                                 </div>
-                                <span style="font-size: 11px; color: rgba(255,255,255,0.15);">|</span>
-                                <div class="pill-scope-selector-btn" title="选择 AI 大模型">
-                                    <span>🤖 模型:</span>
-                                    <select id="ai-model-selector">
-                                        <optgroup label="Google Gemini (默认推荐)">
-                                            <option value="gemini-2.5-flash" selected>✦ Gemini 2.5 Flash (极速且强大)</option>
-                                            <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (深度逻辑与推理)</option>
-                                            <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (轻量响应)</option>
-                                            <option value="gemini-1.5-pro">🪐 Gemini 1.5 Pro (经典大上下文)</option>
+                                <div class="pill-scope-selector-btn" title="切换 AI 大模型">
+                                    <span>🤖</span>
+                                    <select id="ai-model-selector" style="max-width:82px;">
+                                        <optgroup label="Gemini">
+                                            <option value="gemini-2.5-flash" selected>Flash</option>
+                                            <option value="gemini-2.5-pro">Pro</option>
+                                            <option value="gemini-1.5-flash">1.5 Flash</option>
+                                            <option value="gemini-1.5-pro">1.5 Pro</option>
                                         </optgroup>
                                         <optgroup label="DeepSeek">
-                                            <option value="deepseek-chat">✦ DeepSeek-V3 (极速对话)</option>
-                                            <option value="deepseek-reasoner">🧠 DeepSeek-R1 (深度思考)</option>
-                                            <option value="deepseek-v4-flash">⚡ DeepSeek-V4-Flash (超低延迟)</option>
-                                            <option value="deepseek-pro">🪐 DeepSeek-Pro (高阶推理)</option>
+                                            <option value="deepseek-chat">V3</option>
+                                            <option value="deepseek-reasoner">R1</option>
+                                            <option value="deepseek-v4-flash">V4 Flash</option>
+                                            <option value="deepseek-pro">Pro</option>
                                         </optgroup>
                                     </select>
                                 </div>
-                                <span style="font-size: 11px; color: rgba(255,255,255,0.15);">|</span>
                                 <div class="pill-scope-selector-btn" title="选择思维视角">
-                                    <span>🧠 视角:</span>
+                                    <span>🧠</span>
                                     <select id="ai-perspective-selector" onchange="window.onPerspectiveChange && window.onPerspectiveChange()">
-                                        <option value="default">🧠 默认灵魂导师</option>
+                                        <option value="default">默认</option>
                                     </select>
                                 </div>
                             </div>
                             
                             <div class="pill-right-accessories">
-                                <button id="btn-stt-ai" class="pill-send-btn" title="语音录入提问 (STT)" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); margin-right: 4px; display: flex; align-items: center; justify-content: center; outline: none;">
+                                <button id="btn-stt-ai" class="pill-send-btn" title="语音录入提问 (STT)" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); display: flex; align-items: center; justify-content: center; outline: none; font-size:11px;">
                                     🎙️
                                 </button>
-                                <button id="btn-prompt-market" class="pill-send-btn" title="提示词模板市场" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); margin-right: 4px; display: flex; align-items: center; justify-content: center; outline: none;">
+                                <button id="btn-prompt-market" class="pill-send-btn" title="提示词模板市场" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); display: flex; align-items: center; justify-content: center; outline: none; font-size:11px;">
                                     🎨
                                 </button>
-                                <button id="btn-ai-settings" class="pill-send-btn" title="配置 API Key 密钥" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); margin-right: 4px;">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <button id="btn-ai-settings" class="pill-send-btn" title="配置 API Key 密钥" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted);">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="12" cy="12" r="3"></circle>
                                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                                     </svg>
                                 </button>
-                                <button id="btn-export-ai" class="pill-send-btn" title="导出当前对话记录 (Markdown)" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); margin-right: 4px; display: none;">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <button id="btn-export-ai" class="pill-send-btn" title="导出当前对话记录 (Markdown)" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-muted); display: none;">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                         <polyline points="7 10 12 15 17 10"></polyline>
                                         <line x1="12" y1="15" x2="12" y2="3"></line>
                                     </svg>
                                 </button>
                                 <button id="btn-send-ai" class="pill-send-btn" title="发送消息">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <line x1="22" y1="2" x2="11" y2="13"></line>
                                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                                     </svg>
@@ -1379,7 +1410,62 @@
                 card.onclick = () => selectNote(note);
                 notesList.appendChild(card);
             });
+
+            // 同步渲染侧边栏便签文件列表
+            renderSidebarNotesList(displayNotes);
         }
+
+        // 📝 渲染侧边栏便签文件列表
+        let sidebarNotesCollapsed = false;
+        window.toggleSidebarNotesList = function() {
+            sidebarNotesCollapsed = !sidebarNotesCollapsed;
+            const list = document.getElementById('sidebar-notes-list');
+            const arrow = document.getElementById('sidebar-notes-arrow');
+            if (list) list.style.display = sidebarNotesCollapsed ? 'none' : 'flex';
+            if (arrow) arrow.style.transform = sidebarNotesCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+        };
+
+        function renderSidebarNotesList(notesArray) {
+            const container = document.getElementById('sidebar-notes-list');
+            const countBadge = document.getElementById('sidebar-notes-count');
+            if (!container) return;
+
+            if (countBadge) countBadge.textContent = notesArray.length;
+
+            if (!notesArray || notesArray.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); text-align: center; font-size: 11px; padding: 8px;">此分类暂无便签</div>';
+                return;
+            }
+
+            container.innerHTML = notesArray.map(note => {
+                const title = note.title || '无标题';
+                const date = note.date ? note.date.substring(0, 10) : '';
+                const words = note.wordCount || 0;
+                const isActive = currentSelectedNote && currentSelectedNote.id === note.id;
+                return `
+                    <div class="sidebar-note-item ${isActive ? 'active' : ''}" 
+                         id="sidebar-note-${note.id}"
+                         onclick="window.selectSidebarNote('${note.id}')"
+                         style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; cursor:pointer; font-size:12px; transition:all 0.15s ease; ${isActive ? 'background:rgba(138,180,248,0.12); color:var(--primary);' : 'color:#c4c7c5;'}"
+                         onmouseover="this.style.background='rgba(255,255,255,0.04)'" 
+                         onmouseout="this.style.background='${isActive ? 'rgba(138,180,248,0.12)' : 'transparent'}'">
+                        <span style="flex-shrink:0; font-size:14px;">📄</span>
+                        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${title}</span>
+                        <span style="flex-shrink:0; font-size:10px; color:var(--text-muted);">${date} · ${words}字</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 📝 侧边栏点击便签文件
+        window.selectSidebarNote = function(noteId) {
+            const file = window.importedFiles.find(f => {
+                return Object.values(f.categories).some(notes => notes.some(n => n.id === noteId));
+            });
+            if (!file) return;
+            const note = Object.values(file.categories).flat().find(n => n.id === noteId);
+            if (note) selectNote(note);
+        };
 
         // 选择并阅读便签
         function selectNote(note) {
@@ -1388,6 +1474,15 @@
             document.querySelectorAll('.note-card').forEach(el => el.classList.remove('active'));
             const cardEl = document.getElementById(`note-${note.id}`);
             if (cardEl) cardEl.classList.add('active');
+
+            // 同步更新侧边栏便签文件列表的激活状态
+            document.querySelectorAll('.sidebar-note-item').forEach(el => el.classList.remove('active'));
+            const sidebarItem = document.getElementById(`sidebar-note-${note.id}`);
+            if (sidebarItem) {
+                sidebarItem.classList.add('active');
+                sidebarItem.style.background = 'rgba(138,180,248,0.12)';
+                sidebarItem.style.color = 'var(--primary)';
+            }
 
             // 无论当前在哪个 tab，只要点击了便签卡片，如果不是 AI 对话模式，就切换回阅读面板
             if (currentTab !== 'ai') {
@@ -1917,6 +2012,9 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
                     clearTimeout(timeoutId);
 
                     if (!response.ok) {
+                        if (response.status === 401) {
+                            throw new Error('DeepSeek API Key 无效、已过期，或当前账户无可用额度。请打开右侧设置检查密钥。');
+                        }
                         throw new Error(`API 访问失败，状态码: ${response.status}`);
                     }
 
@@ -1944,6 +2042,9 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
                     clearTimeout(timeoutId);
 
                     if (!response.ok) {
+                        if (response.status === 401) {
+                            throw new Error('Google Gemini API Key 无效、已过期，或当前账户无可用权限。请打开右侧设置检查密钥。');
+                        }
                         throw new Error(`API 访问失败，状态码: ${response.status}`);
                     }
 
@@ -2338,4 +2439,3 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
     </div>
 </body>
 </html>
-

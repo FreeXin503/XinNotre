@@ -1,15 +1,24 @@
-﻿        :root {
+:root {
             --bg-base: #080e1a; /* 深蓝深邃 - 夜空海洋 */
+            --bg-deeper: #040810;
             --bg-surface: #0f1729; /* 深海表面 */
+            --bg-surface-solid: #0f1729;
             --bg-hover: #1a2440; /* 深蓝悬浮 */
             --border-color: #1e3050; /* 幽蓝边框 */
+            --border-glow: rgba(255, 255, 255, 0.08);
             --primary: #6ea8fe; /* 星辰蓝 */
             --primary-glow: rgba(110, 168, 254, 0.12);
+            --primary-strong: rgba(110, 168, 254, 0.2);
             --secondary: #a8d5ff; /* 浅蓝点缀 */
             --text-main: #e2e8f0; /* 冷白主色 */
             --text-muted: #8892b0; /* 雾蓝辅助 */
             --success: #34d399; /* 翡翠绿 */
             --gradient-gemini: linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6); /* 蓝紫渐变 */
+            --glass-bg: rgba(15, 23, 41, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.06);
+            --glass-blur: 24px;
+            --transition-speed: 0.3s;
+            --transition-curve: cubic-bezier(0.22, 0.61, 0.36, 1);
         }
 
         body.light-theme {
@@ -388,7 +397,31 @@
             color: var(--primary);
         }
 
-        /* 侧边栏底�?(Profile & Settings Footer) */
+        /* 📝 侧边栏便签文件列表 */
+        .sidebar-note-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #c4c7c5;
+            transition: all 0.15s ease;
+        }
+
+        .sidebar-note-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+        }
+
+        .sidebar-note-item.active {
+            background: rgba(138, 180, 248, 0.12);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        /* 侧边栏底?(Profile & Settings Footer) */
         .sidebar-footer {
             border-top: 1px solid var(--border-color);
             padding: 16px 20px;
@@ -1027,11 +1060,11 @@
             backdrop-filter: blur(var(--glass-blur));
             -webkit-backdrop-filter: blur(var(--glass-blur));
             border: 1px solid var(--glass-border);
-            border-radius: 28px;
-            padding: 8px 8px 8px 22px;
+            border-radius: 22px;
+            padding: 6px 6px 6px 16px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
             transition: border-color 0.2s, box-shadow 0.2s;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
@@ -1052,14 +1085,14 @@
             background: transparent;
             border: none;
             color: white;
-            font-size: 14.5px;
+            font-size: 13.5px;
             outline: none;
             resize: none;
             font-family: inherit;
             line-height: 1.5;
-            max-height: 120px;
-            min-height: 22px;
-            padding: 6px 8px 6px 0;
+            max-height: 100px;
+            min-height: 20px;
+            padding: 4px 6px 4px 0;
         }
 
         .gemini-pill-bar textarea::placeholder {
@@ -1072,27 +1105,28 @@
             justify-content: space-between;
             align-items: center;
             border-top: 1px solid rgba(255, 255, 255, 0.04);
-            padding-top: 5px;
-            margin-top: 2px;
+            padding-top: 3px;
+            margin-top: 1px;
         }
 
         .pill-left-accessories {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             flex-wrap: wrap;
         }
 
         .pill-scope-selector-btn {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 14px;
-            padding: 2px 8px;
+            border-radius: 8px;
+            padding: 0 5px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 2px;
             cursor: pointer;
             transition: all 0.2s ease;
+            height: 20px;
         }
         .pill-scope-selector-btn:hover {
             background: rgba(255, 255, 255, 0.08);
@@ -1100,7 +1134,7 @@
         }
 
         .pill-scope-selector-btn span {
-            font-size: 10.5px;
+            font-size: 9px;
             color: var(--text-muted);
             font-weight: 500;
             white-space: nowrap;
@@ -1110,22 +1144,24 @@
             background: transparent;
             border: none;
             color: var(--primary);
-            font-size: 10.5px;
+            font-size: 9px;
             font-weight: 600;
             outline: none;
             cursor: pointer;
-            max-width: 110px;
+            max-width: 60px;
+            padding: 0;
+            line-height: 1;
         }
 
         .pill-right-accessories {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 1px;
         }
 
         .pill-send-btn {
-            width: 32px;
-            height: 32px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             background: transparent;
             border: none;
@@ -1154,6 +1190,13 @@
         #btn-send-ai.pill-send-btn.active {
             background: var(--primary);
             color: #131314;
+        }
+        #btn-send-ai.pill-send-btn.stop-mode {
+            background: #ea4335;
+            color: #fff;
+        }
+        #btn-send-ai.pill-send-btn.stop-mode:hover {
+            background: #d33426;
         }
 
         .ai-chat-input-container {

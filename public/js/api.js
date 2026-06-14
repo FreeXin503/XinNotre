@@ -25,6 +25,24 @@ export const ApiClient = {
     return !!this.getToken();
   },
 
+  handleAuthFailure(message) {
+    this.clearToken();
+    localStorage.removeItem('xinnote_username');
+    throw new Error(message || '登录已失效，请重新登录');
+  },
+
+  async request(path, options = {}) {
+    const res = await fetch(`${API_BASE}${path}`, options);
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      this.handleAuthFailure(data.error || '登录已失效，请重新登录');
+    }
+    if (!res.ok) {
+      throw new Error(data.error || '请求失败');
+    }
+    return data;
+  },
+
   getHeaders() {
     const token = this.getToken();
     return {
@@ -34,24 +52,20 @@ export const ApiClient = {
   },
 
   async register(username, password) {
-    const res = await fetch(`${API_BASE}/auth/register`, {
+    const data = await this.request('/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '注册失败');
     return data;
   },
 
   async login(username, password) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const data = await this.request('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '登录失败');
     this.setToken(data.token);
     this.setUsername(data.user.username);
     return data;
@@ -61,71 +75,81 @@ export const ApiClient = {
     const params = new URLSearchParams();
     if (filters.category) params.append('category', filters.category);
     if (filters.search) params.append('search', filters.search);
-    
-    const res = await fetch(`${API_BASE}/notes?${params.toString()}`, {
+
+    return this.request(`/notes?${params.toString()}`, {
       method: 'GET',
       headers: this.getHeaders()
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '获取便签失败');
-    return data;
+  },
+
+  async getDeletedNotes() {
+    return this.request('/notes/deleted', {
+      method: 'GET',
+      headers: this.getHeaders()
+    });
   },
 
   async getNoteDetail(id) {
-    const res = await fetch(`${API_BASE}/notes/${id}`, {
+    return this.request(`/notes/${id}`, {
       method: 'GET',
       headers: this.getHeaders()
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '获取详情失败');
-    return data;
   },
 
   async createNote(note) {
-    const res = await fetch(`${API_BASE}/notes`, {
+    return this.request('/notes', {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(note)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '新建便签失败');
-    return data;
   },
 
   async updateNote(id, note) {
-    const res = await fetch(`${API_BASE}/notes/${id}`, {
+    return this.request(`/notes/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(note)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '更新便签失败');
-    return data;
   },
 
   async deleteNote(id, hard = false) {
-    const res = await fetch(`${API_BASE}/notes/${id}?hard=${hard}`, {
+    return this.request(`/notes/${id}?hard=${hard}`, {
       method: 'DELETE',
       headers: this.getHeaders()
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '删除便签失败');
-    return data;
+  },
+
+  async restoreNote(id) {
+    return this.request(`/notes/${id}/restore`, {
+      method: 'POST',
+      headers: this.getHeaders()
+    });
   },
 
   async syncPush(notes) {
-    const res = await fetch(`${API_BASE}/sync/push`, {
+    return this.request('/sync/push', {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ notes })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '数据同步失败');
-    return data;
+  },
+
+  async getSyncHistory() {
+    return this.request('/sync/history', {
+      method: 'GET',
+      headers: this.getHeaders()
+    });
+  },
+
+  async getHealth() {
+    return this.request('/health', {
+      method: 'GET',
+      headers: this.getHeaders()
+    });
   },
 
   // SSE streaming AI Chat
-  chatStream(payload, onChunk, onDone, onError) {
+  chatStream(payload, onChunk, onDone, onError, signal) {
     const token = this.getToken();
     fetch(`${API_BASE}/ai/chat`, {
       method: 'POST',
@@ -133,10 +157,16 @@ export const ApiClient = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal
     }).then(response => {
       if (!response.ok) {
         throw new Error(`AI 请求失败 (状态码 ${response.status})`);
+      }
+
+      if (signal?.aborted) {
+        onDone();
+        return;
       }
       
       const reader = response.body.getReader();
@@ -145,6 +175,11 @@ export const ApiClient = {
 
       function read() {
         reader.read().then(({ done, value }) => {
+          if (signal?.aborted) {
+            reader.cancel();
+            onDone();
+            return;
+          }
           if (done) {
             onDone();
             return;
@@ -152,7 +187,7 @@ export const ApiClient = {
           
           buffer += decoder.decode(value, { stream: true });
           const events = buffer.split('\n\n');
-          buffer = events.pop(); // save trailing fragment
+          buffer = events.pop();
 
           for (const ev of events) {
             if (!ev.trim()) continue;
@@ -188,13 +223,21 @@ export const ApiClient = {
           }
           read();
         }).catch(err => {
-          onError(err);
+          if (err.name === 'AbortError') {
+            onDone();
+          } else {
+            onError(err);
+          }
         });
       }
       
       read();
     }).catch(err => {
-      onError(err);
+      if (err.name === 'AbortError') {
+        onDone();
+      } else {
+        onError(err);
+      }
     });
   },
 

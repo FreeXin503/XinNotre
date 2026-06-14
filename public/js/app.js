@@ -1,5 +1,16 @@
 ﻿import { ApiClient } from './api.js';
 
+// 覆盖 inline 的预设卡片发送，改用流式路径
+window.sendAiPreset = async function(presetText) {
+  const input = document.getElementById('ai-chat-input');
+  const welcomeMsg = document.querySelector('.ai-msg-welcome');
+  if (welcomeMsg) welcomeMsg.style.display = 'none';
+  if (input) {
+    input.value = presetText;
+    if (window.handleStreamingSend) window.handleStreamingSend();
+  }
+};
+
 // 全局状态引用（精确同步 index.html 内核）
 // 直接使用 window 上的引用，避免与 preview.html 的原始渲染引擎数据不同步
 let importedFiles = window.importedFiles || [];
@@ -7,6 +18,8 @@ let activeFileId = 'db-notes';
 let activeCategoryName = '全部便签';
 let currentSelectedNote = null;
 let notesList = document.getElementById('notes-list');
+let deletedNotesCache = [];
+let syncHistoryCache = [];
 
 // 确保全局变量初始化
 window.importedFiles = importedFiles;
@@ -69,6 +82,7 @@ window.onPerspectiveChange = function() {
   // 联动控制联席会诊模式面板的显隐
   const selector = document.getElementById('ai-perspective-selector');
   const multiAgentBar = document.getElementById('multi-agent-bar');
+  const multiTabBar = document.getElementById('multi-tab-bar');
   if (multiAgentBar) {
     if (selector && selector.value === 'multi-agent') {
       multiAgentBar.style.display = 'flex';
@@ -78,8 +92,16 @@ window.onPerspectiveChange = function() {
       }
       const arrow = document.getElementById('multi-agent-arrow');
       if (arrow) arrow.style.transform = 'rotate(0deg)';
+      // Show tab bar if in tab mode
+      if (multiTabBar && window.multiAgentMode === 'tab') {
+        multiTabBar.style.display = 'flex';
+        window.renderMultiTabHeaders();
+      } else if (multiTabBar) {
+        multiTabBar.style.display = 'none';
+      }
     } else {
       multiAgentBar.style.display = 'none';
+      if (multiTabBar) multiTabBar.style.display = 'none';
     }
   }
 
@@ -177,6 +199,33 @@ function setupFullstackUI() {
       } catch (err) {
         authError.textContent = err.message;
         authError.style.display = 'block';
+      }
+    });
+  }
+
+  const trashCard = document.getElementById('btn-trash-view');
+  if (trashCard) {
+    trashCard.addEventListener('click', () => {
+      if (typeof window.openTrashDrawer === 'function') {
+        window.openTrashDrawer();
+      }
+    });
+  }
+
+  const healthBtn = document.getElementById('btn-health-check-action');
+  if (healthBtn) {
+    healthBtn.addEventListener('click', async () => {
+      const originalText = healthBtn.textContent;
+      healthBtn.textContent = '🩺 正在检查...';
+      healthBtn.setAttribute('disabled', 'disabled');
+      try {
+        const health = await ApiClient.getHealth();
+        alert(`云端健康状态：${health.status}\n数据库：${health.db}\n时间：${health.timestamp}`);
+      } catch (err) {
+        alert('健康检查失败: ' + err.message);
+      } finally {
+        healthBtn.textContent = originalText;
+        healthBtn.removeAttribute('disabled');
       }
     });
   }
@@ -360,12 +409,112 @@ async function checkAuthAndInit() {
           if (multiAgentBar) multiAgentBar.style.paddingBottom = '4px';
         }
       };
-      
+
+      window.toggleMultiAgentBarFold = function() {
+        const bar = document.getElementById('multi-agent-bar');
+        const checkboxesContainer = document.getElementById('multi-agent-checkboxes');
+        const modeBar = document.getElementById('multi-agent-mode-bar');
+        const arrow = document.getElementById('multi-agent-arrow');
+        const chip = document.getElementById('multi-agent-fold-chip');
+        if (!bar) return;
+
+        const isFolded = checkboxesContainer?.style.display === 'none' && modeBar?.style.display === 'none';
+        if (isFolded) {
+          bar.style.display = 'flex';
+          bar.style.padding = '10px';
+          bar.style.minHeight = '';
+          if (modeBar) modeBar.style.display = 'flex';
+          if (checkboxesContainer) checkboxesContainer.style.display = 'flex';
+          if (arrow) arrow.style.transform = 'rotate(0deg)';
+          if (chip) chip.style.display = 'none';
+        } else {
+          if (checkboxesContainer) checkboxesContainer.style.display = 'none';
+          if (modeBar) modeBar.style.display = 'none';
+          bar.style.display = 'none';
+          if (chip) chip.style.display = 'inline-flex';
+        }
+      };
+
       console.log('🎉 动态视角载入成功，共计：', res.skills.length, '个');
     }
   } catch (err) {
     console.error('加载女娲技能视角失败:', err);
   }
+
+  // ===== 多视角对话模式管理 =====
+  window.multiAgentMode = 'group'; // 'group' | 'tab' | 'rotate'
+  window.multiTabHistories = {}; // { agentId: [messages] }
+  window.multiTabActiveAgent = null; // 当前活跃标签页视角 ID
+  window.rotateQueue = []; // 轮流对话队列
+  window.rotateCurrentIndex = 0; // 当前轮流位置
+
+  // 🎯 切换对话模式
+  window.setMultiAgentMode = function(mode) {
+    window.multiAgentMode = mode;
+    // 更新按钮激活样式
+    document.querySelectorAll('.multi-mode-btn').forEach(btn => {
+      const isActive = btn.getAttribute('data-mode') === mode;
+      btn.style.background = isActive ? 'var(--primary)' : 'rgba(255,255,255,0.05)';
+      btn.style.border = isActive ? '1px solid var(--primary)' : '1px solid var(--border-color)';
+      btn.style.color = isActive ? '#131314' : '#fff';
+      btn.classList.toggle('active', isActive);
+    });
+    // 显示/隐藏对应 UI
+    const multiAgentBar = document.getElementById('multi-agent-bar');
+    const multiTabBar = document.getElementById('multi-tab-bar');
+    if (multiAgentBar) multiAgentBar.style.display = 'flex';
+    if (multiTabBar) {
+      if (mode === 'tab') {
+        multiTabBar.style.display = 'flex';
+        window.renderMultiTabHeaders();
+      } else {
+        multiTabBar.style.display = 'none';
+      }
+    }
+    // 重置轮流状态
+    if (mode === 'rotate') {
+      window.rotateQueue = [];
+      window.rotateCurrentIndex = 0;
+    }
+  };
+
+  // 📑 渲染多标签页头部
+  window.renderMultiTabHeaders = function() {
+    const headersContainer = document.getElementById('multi-tab-headers');
+    const contentsContainer = document.getElementById('multi-tab-contents');
+    if (!headersContainer || !contentsContainer) return;
+
+    const checkedCbs = document.querySelectorAll('.multi-agent-selector-checkbox:checked');
+    let html = '';
+    checkedCbs.forEach(cb => {
+      const agentId = cb.value;
+      const p = window.PERSPECTIVES[agentId];
+      if (!p) return;
+      const isActive = window.multiTabActiveAgent === agentId;
+      html += `<button class="multi-tab-header-btn" data-agent="${agentId}" onclick="window.switchMultiTab('${agentId}')"
+        style="padding:4px 12px; font-size:11px; border-radius:8px; cursor:pointer; font-weight:600; transition:all 0.2s;
+        background:${isActive?'var(--primary)':'rgba(255,255,255,0.05)'}; border:1px solid ${isActive?'var(--primary)':'var(--border-color)'};
+        color:${isActive?'#131314':'#fff'};">${p.icon} ${p.senderName}</button>`;
+    });
+    headersContainer.innerHTML = html;
+
+    // Show active tab content
+    if (window.multiTabActiveAgent && window.multiTabHistories[window.multiTabActiveAgent]) {
+      const history = window.multiTabHistories[window.multiTabActiveAgent];
+      contentsContainer.innerHTML = history.map(m => {
+        if (m.role === 'user') return `<div style="padding:6px 10px; background:rgba(66,133,244,0.1); border-radius:8px; font-size:12px; margin:2px 0;"><strong>你:</strong> ${m.displayContent || m.content}</div>`;
+        return `<div style="padding:6px 10px; background:rgba(255,255,255,0.03); border-radius:8px; font-size:12px; margin:2px 0;" class="markdown-body">${marked.parse(m.content.replace(/^\[.*?\]:\s*/, ''))}</div>`;
+      }).join('');
+    } else {
+      contentsContainer.innerHTML = '<div style="font-size:12px; color:var(--text-muted); padding:10px; text-align:center;">选择上方标签页查看对话内容</div>';
+    }
+  };
+
+  // 📑 切换多标签页
+  window.switchMultiTab = function(agentId) {
+    window.multiTabActiveAgent = agentId;
+    window.renderMultiTabHeaders();
+  };
 
   await loadNotesFromDB();
 }
@@ -379,6 +528,12 @@ function handleLogout() {
 
 // 核心数据库加载引擎：拉取全栈云端数据并无损适配原生可视化面板
 async function loadNotesFromDB() {
+  if (!ApiClient.isLoggedIn()) {
+    const overlay = document.getElementById('auth-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    return;
+  }
+
   try {
     // 【已修复修正】对接 index.html 原生搜索框的真正 ID: 'search-input'
     const searchQuery = document.getElementById('search-input')?.value || '';
@@ -415,6 +570,11 @@ async function loadNotesFromDB() {
       collapsed: false
     };
 
+    deletedNotesCache = [];
+    if (typeof data.deletedCount === 'number') {
+      updateDeletedCountBadge(data.deletedCount);
+    }
+
     // 保留已载入的本地备份文件，仅更新云端数据库节点
     const localFiles = (window.importedFiles || []).filter(f => f.id !== 'db-notes');
     window.importedFiles = [dbFileObj, ...localFiles];
@@ -424,9 +584,139 @@ async function loadNotesFromDB() {
     if (typeof window.updateGlobalDataAndUI === 'function') {
       window.updateGlobalDataAndUI();
     }
+
+    await loadSyncHistory();
   } catch (err) {
     console.error('全栈云端数据载入失败:', err.message);
+    if (err.message.includes('Auth failed') || err.message.includes('登录已失效') || err.message.includes('重新登录')) {
+      const overlay = document.getElementById('auth-overlay');
+      if (overlay) overlay.style.display = 'flex';
+    }
   }
+}
+
+function updateDeletedCountBadge(count) {
+  const badge = document.getElementById('stat-deleted-notes');
+  if (badge) badge.textContent = String(count);
+  const btn = document.getElementById('btn-trash-view');
+  if (btn) {
+    btn.dataset.count = String(count);
+    btn.textContent = `🗑️ 回收站 (${count})`;
+  }
+}
+
+async function loadDeletedNotes() {
+  try {
+    const data = await ApiClient.getDeletedNotes();
+    deletedNotesCache = data.notes || [];
+    updateDeletedCountBadge(deletedNotesCache.length);
+    renderTrashDrawer();
+  } catch (err) {
+    alert('获取回收站失败: ' + err.message);
+  }
+}
+
+async function loadSyncHistory() {
+  try {
+    const data = await ApiClient.getSyncHistory();
+    syncHistoryCache = data.history || [];
+    renderSyncHistoryPanel();
+  } catch (err) {
+    console.error('获取同步历史失败:', err.message);
+  }
+}
+
+function renderSyncHistoryPanel() {
+  let panel = document.getElementById('sync-history-panel');
+  if (panel) panel.remove();
+
+  const packContainer = document.getElementById('pack-container');
+  if (!packContainer) return;
+
+  panel = document.createElement('div');
+  panel.id = 'sync-history-panel';
+  panel.style.cssText = 'margin-top:16px; padding:16px; border:1px solid var(--border-color); border-radius:16px; background: rgba(255,255,255,0.02);';
+
+  const items = syncHistoryCache.length > 0
+    ? syncHistoryCache.map(item => {
+        const time = new Date(item.created_at).toLocaleString();
+        const statusMap = {
+          success: '✅ 成功',
+          failed: '❌ 失败',
+          empty: '📭 空同步'
+        };
+        const status = statusMap[item.status] || item.status;
+        const summary = `总数 ${item.total_count} / 新增 ${item.inserted_count} / 更新 ${item.updated_count} / 跳过 ${item.skipped_count}`;
+        const error = item.error_message ? `<div style="font-size:12px; color:#ea4335; margin-top:4px;">${item.error_message}</div>` : '';
+        return `<div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+            <div style="font-weight:600; color:var(--text-main);">${status}</div>
+            <div style="font-size:12px; color:var(--text-muted);">${time}</div>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${summary}</div>
+          ${error}
+        </div>`;
+      }).join('')
+    : '<div style="font-size:12px; color:var(--text-muted);">暂无同步记录。</div>';
+
+  panel.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+      <div style="font-size:14px; font-weight:600; color:var(--text-main);">☁️ 最近同步记录</div>
+      <button id="btn-sync-history-refresh" style="background: transparent; border:1px solid var(--border-color); color: var(--text-muted); padding: 4px 10px; border-radius: 8px; cursor: pointer;">刷新</button>
+    </div>
+    <div>${items}</div>
+  `;
+
+  packContainer.appendChild(panel);
+  panel.querySelector('#btn-sync-history-refresh')?.addEventListener('click', loadSyncHistory);
+}
+
+function renderTrashDrawer() {
+  let drawer = document.getElementById('trash-drawer');
+  if (drawer) drawer.remove();
+
+  const dashboard = document.getElementById('dashboard-view');
+  if (!dashboard) return;
+
+  drawer = document.createElement('div');
+  drawer.id = 'trash-drawer';
+  drawer.style.cssText = 'width:100%; margin-top:20px; padding:16px; border:1px solid var(--border-color); border-radius:16px; background: rgba(255,255,255,0.02);';
+
+  const items = deletedNotesCache.length > 0
+    ? deletedNotesCache.map(note => {
+        const dateStr = new Date(note.updated_at).toLocaleString();
+        return `<div style="display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+          <div>
+            <div style="font-weight:600; color:var(--text-main);">${note.title || '无标题'}</div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">${note.category || '未分类'} · ${dateStr}</div>
+          </div>
+          <button class="btn-restore-note" data-note-id="${note.id}" style="background: rgba(52,168,83,0.12); border: 1px solid rgba(52,168,83,0.2); color: var(--success); padding: 6px 12px; border-radius: 8px; cursor: pointer;">恢复</button>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-muted); font-size:13px; padding:8px 0;">回收站为空。</div>';
+
+  drawer.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px;">
+      <div style="font-size:14px; font-weight:600; color:var(--text-main);">🗑️ 回收站</div>
+      <button id="btn-trash-refresh" style="background: transparent; border:1px solid var(--border-color); color: var(--text-muted); padding: 4px 10px; border-radius: 8px; cursor: pointer;">刷新</button>
+    </div>
+    <div>${items}</div>
+  `;
+
+  dashboard.appendChild(drawer);
+
+  drawer.querySelector('#btn-trash-refresh')?.addEventListener('click', loadDeletedNotes);
+  drawer.querySelectorAll('.btn-restore-note').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await ApiClient.restoreNote(btn.dataset.noteId);
+        await loadNotesFromDB();
+        await loadDeletedNotes();
+      } catch (err) {
+        alert('恢复失败: ' + err.message);
+      }
+    });
+  });
 }
 
 // 新建便签交互控制
@@ -500,19 +790,24 @@ async function saveNoteEdits() {
 
 async function handleDeleteNote() {
   if (!currentSelectedNote) return;
-  if (!confirm(`您确定要永久删除云端便签《${currentSelectedNote.title}》吗？此操作无法撤销。`)) return;
+  if (!confirm(`您确定要把云端便签《${currentSelectedNote.title}》移入回收站吗？之后可恢复。`)) return;
 
   try {
     await ApiClient.deleteNote(currentSelectedNote.id);
     currentSelectedNote = null;
     window.currentSelectedNote = null;
     await loadNotesFromDB();
+    await loadDeletedNotes();
     
     document.getElementById('reader-view').style.display = 'none';
     document.getElementById('dashboard-view').style.display = 'flex';
   } catch (err) {
     alert('云端删除失败: ' + err.message);
   }
+}
+
+window.openTrashDrawer = async function() {
+  await loadDeletedNotes();
 }
 
 // 拦截劫持原生 selectNote 动作，注入全栈历史版本时空轨迹渲染
@@ -598,37 +893,80 @@ function renderVersionHistory(versions) {
 }
 
 // ==================== 🧠 AI 灵魂流式流控对答系统修复对接 ====================
-const btnSendAi = document.getElementById('btn-send-ai');
-const aiChatInput = document.getElementById('ai-chat-input');
-const aiChatMessages = document.getElementById('ai-chat-messages');
+let currentAbortController = null;
 
-if (btnSendAi) {
-  const newBtnSend = btnSendAi.cloneNode(true);
-  btnSendAi.parentNode.replaceChild(newBtnSend, btnSendAi);
-  newBtnSend.addEventListener('click', handleStreamingSend);
+function setSendButtonMode(mode) {
+  const btn = document.getElementById('btn-send-ai');
+  if (!btn) return;
+  if (mode === 'stop') {
+    btn.title = '停止输出';
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+    btn.classList.add('stop-mode');
+    btn.onclick = function stopClick() {
+      if (currentAbortController) {
+        currentAbortController.abort();
+        currentAbortController = null;
+      }
+      setSendButtonMode('send');
+    };
+  } else {
+    btn.title = '发送消息';
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+    btn.classList.remove('stop-mode');
+    btn.onclick = handleStreamingSend;
+  }
 }
 
-if (aiChatInput) {
+// Strip inline addEventListener from button (from index.html inline script)
+const oldBtn = document.getElementById('btn-send-ai');
+if (oldBtn) {
+  const newBtn = oldBtn.cloneNode(true);
+  oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+  newBtn.onclick = handleStreamingSend;
+}
+
+// Strip inline listeners from aiChatInput, then attach ours
+const oldInput = document.getElementById('ai-chat-input');
+const aiChatMessages = document.getElementById('ai-chat-messages');
+let aiChatInput;
+if (oldInput) {
+  const newInput = oldInput.cloneNode(true);
+  oldInput.parentNode.replaceChild(newInput, oldInput);
+  aiChatInput = newInput;
   aiChatInput.addEventListener('keydown', (e) => {
-    // @ popup navigation takes priority
     if (window.atMentionHandleKey && window.atMentionHandleKey(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleStreamingSend();
     }
   });
-  // Auto-resize + @ trigger
   aiChatInput.addEventListener('input', (e) => {
+    const btn = document.getElementById('btn-send-ai');
+    if (btn) btn.classList.toggle('active', e.target.value.trim().length > 0);
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
     if (window.atMentionHandleInput) window.atMentionHandleInput(e);
   });
 }
 
+function finishStreaming() {
+  if (--window.__pendingStreams <= 0) {
+    currentAbortController = null;
+    window.__pendingStreams = 0;
+    setSendButtonMode('send');
+  }
+}
+
 window.handleStreamingSend = handleStreamingSend;
 async function handleStreamingSend() {
+  if (currentAbortController) return;
   const rawQuery = aiChatInput.value.trim();
   if (!rawQuery) return;
+
+  const abortController = new AbortController();
+  currentAbortController = abortController;
+  window.__pendingStreams = 0;
+  setSendButtonMode('stop');
 
   // === @ 引用上下文注入 ===
   const atRefs = window.atSelectedRefs ? [...window.atSelectedRefs] : [];
@@ -694,7 +1032,7 @@ async function handleStreamingSend() {
   aiChatInput.style.height = 'auto';
   aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
 
-  // 1. 👥 多专家联席会诊模式下进行并行提问作答
+  // 1. 👥 多专家联席会诊模式
   if (currentPerspectiveId === 'multi-agent') {
     const checkedAgentCbs = document.querySelectorAll('.multi-agent-selector-checkbox:checked');
     if (checkedAgentCbs.length === 0) {
@@ -702,93 +1040,265 @@ async function handleStreamingSend() {
       return;
     }
 
+    const currentMode = window.multiAgentMode || 'group';
+
     // 记录用户消息
     window.aiMessageHistory.push({ role: 'user', content: enrichedUserMsg });
 
-    let completedCount = 0;
-    const totalAgents = checkedAgentCbs.length;
+    if (currentMode === 'group') {
+      // ===== 👥 群聊模式：所有专家并行回答 =====
+      let completedCount = 0;
+      const totalAgents = checkedAgentCbs.length;
+      const historyBeforeMulti = window.aiMessageHistory.filter(m => m.role !== 'assistant');
 
-    // Snapshot history before multi-agent to prevent cross-contamination
-    const historyBeforeMulti = window.aiMessageHistory.filter(m => m.role !== 'assistant');
+      checkedAgentCbs.forEach(cb => {
+        const agentId = cb.value;
+        const perspective = window.PERSPECTIVES[agentId];
+        if (!perspective) return;
 
-    checkedAgentCbs.forEach(cb => {
-      const agentId = cb.value;
-      const perspective = window.PERSPECTIVES[agentId];
-      if (!perspective) return;
+        const personaSystemInstruction = perspective.personaPrompt;
 
-      const personaSystemInstruction = perspective.personaPrompt;
+        const aiBubble = appendChatBubble('ai', '');
+        const contentArea = aiBubble.querySelector('.bubble-text');
+        const thinkingArea = aiBubble.querySelector('.thinking-body');
+        const thinkingContainer = aiBubble.querySelector('.thinking-container');
 
-      // 渲染该专家的专属 AI 回答气泡
-      const aiBubble = appendChatBubble('ai', '');
-      const contentArea = aiBubble.querySelector('.bubble-text');
-      const thinkingArea = aiBubble.querySelector('.thinking-body');
-      const thinkingContainer = aiBubble.querySelector('.thinking-container');
+        const bubbleHeader = document.createElement('div');
+        bubbleHeader.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--primary); margin-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.04); padding-bottom:4px;';
+        bubbleHeader.innerHTML = `${perspective.avatarSvg || '🧠'} <span>${perspective.senderName} (${perspective.icon})</span>`;
+        aiBubble.insertBefore(bubbleHeader, aiBubble.firstChild);
 
-      // 注入专家头部标识栏
-      const bubbleHeader = document.createElement('div');
-      bubbleHeader.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--primary); margin-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.04); padding-bottom:4px;';
-      bubbleHeader.innerHTML = `${perspective.avatarSvg || '🧠'} <span>${perspective.senderName} (${perspective.icon})</span>`;
-      aiBubble.insertBefore(bubbleHeader, aiBubble.firstChild);
+        const agentHistory = historyBeforeMulti.concat(
+          window.aiMessageHistory.filter(m => m.role === 'assistant' && m.content.startsWith(`[${perspective.senderName}]`))
+        );
 
-      // Each expert only sees non-assistant history + their own prior responses
-      const agentHistory = historyBeforeMulti.concat(
-        window.aiMessageHistory.filter(m => m.role === 'assistant' && m.content.startsWith(`[${perspective.senderName}]`))
-      );
+        const payload = {
+          messages: agentHistory,
+          model: selectedModel,
+          contextMode,
+          currentNoteId: currentSelectedNote?.id,
+          currentCategory: activeCategoryName,
+          systemInstruction: personaSystemInstruction
+        };
 
-      const payload = {
-        messages: agentHistory,
-        model: selectedModel,
-        contextMode,
-        currentNoteId: currentSelectedNote?.id,
-        currentCategory: activeCategoryName,
-        systemInstruction: personaSystemInstruction
-      };
+        let fullContent = '';
+        let fullReasoning = '';
+        contentArea.innerHTML = `<span class="typing-loading" style="color: var(--text-muted); font-style: italic;">${perspective.senderName} 正在分析研究，请稍候...</span>`;
 
-      let fullContent = '';
-      let fullReasoning = '';
+        window.__pendingStreams++;
+        ApiClient.chatStream(
+          payload,
+          (chunk) => {
+            if (chunk.reasoning) {
+              if (thinkingContainer) thinkingContainer.style.display = 'block';
+              fullReasoning += chunk.reasoning;
+              if (thinkingArea) thinkingArea.innerHTML = marked.parse(fullReasoning);
+            }
+            if (chunk.content) {
+              const loading = contentArea.querySelector('.typing-loading');
+              if (loading) loading.remove();
+              fullContent += chunk.content;
+              contentArea.innerHTML = marked.parse(fullContent);
+            }
+            aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+          },
+          () => {
+            window.aiMessageHistory.push({
+              role: 'assistant',
+              content: `[${perspective.senderName}]: ${fullContent}`
+            });
+            completedCount++;
+            if (completedCount === totalAgents) {
+              appendDynamicFollowUpSuggestions();
+              if (typeof window.autoArchiveCurrentChat === 'function') window.autoArchiveCurrentChat();
+            }
+            const btnExport = document.getElementById('btn-export-ai');
+            if (btnExport) btnExport.style.display = 'flex';
+            finishStreaming();
+          },
+          (err) => {
+            contentArea.innerHTML = `<span style="color: #ea4335; font-weight: 600;">❌ [${perspective.senderName}] 诊断中断: ${err.message}</span>`;
+            completedCount++;
+            if (completedCount === totalAgents) {
+              appendDynamicFollowUpSuggestions();
+            }
+            finishStreaming();
+          },
+          abortController.signal
+        );
+      });
 
-      contentArea.innerHTML = `<span class="typing-loading" style="color: var(--text-muted); font-style: italic;">${perspective.senderName} 正在分析研究，请稍候...</span>`;
+    } else if (currentMode === 'tab') {
+      // ===== 📑 标签页模式：每个专家独立标签页 =====
+      if (!window.multiTabHistories) window.multiTabHistories = {};
 
-      ApiClient.chatStream(
-        payload,
-        (chunk) => {
-          if (chunk.reasoning) {
-            if (thinkingContainer) thinkingContainer.style.display = 'block';
-            fullReasoning += chunk.reasoning;
-            if (thinkingArea) thinkingArea.innerHTML = marked.parse(fullReasoning);
-          }
-          if (chunk.content) {
-            const loading = contentArea.querySelector('.typing-loading');
-            if (loading) loading.remove();
-            
-            fullContent += chunk.content;
-            contentArea.innerHTML = marked.parse(fullContent);
-          }
-          aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
-        },
-        () => {
-          // Save response to history (labeled by expert name)
-          window.aiMessageHistory.push({
-            role: 'assistant',
-            content: `[${perspective.senderName}]: ${fullContent}`
-          });
-          completedCount++;
-          if (completedCount === totalAgents) {
-            appendDynamicFollowUpSuggestions();
-            if (typeof window.autoArchiveCurrentChat === 'function') window.autoArchiveCurrentChat();
-          }
+      let completedCount = 0;
+      const totalAgents = checkedAgentCbs.length;
+
+      checkedAgentCbs.forEach(cb => {
+        const agentId = cb.value;
+        const perspective = window.PERSPECTIVES[agentId];
+        if (!perspective) return;
+
+        if (!window.multiTabHistories[agentId]) {
+          window.multiTabHistories[agentId] = [];
+        }
+        window.multiTabHistories[agentId].push({ role: 'user', content: enrichedUserMsg, displayContent: finalQuery });
+
+        if (!window.multiTabActiveAgent) {
+          window.multiTabActiveAgent = agentId;
+        }
+
+        const personaSystemInstruction = perspective.personaPrompt;
+        const agentHistory = window.multiTabHistories[agentId].filter(m => !m.displayContent);
+
+        const payload = {
+          messages: agentHistory,
+          model: selectedModel,
+          contextMode,
+          currentNoteId: currentSelectedNote?.id,
+          currentCategory: activeCategoryName,
+          systemInstruction: personaSystemInstruction
+        };
+
+        let fullContent = '';
+        let fullReasoning = '';
+
+        window.__pendingStreams++;
+        ApiClient.chatStream(
+          payload,
+          (chunk) => {
+            if (chunk.reasoning) fullReasoning += chunk.reasoning;
+            if (chunk.content) fullContent += chunk.content;
+          },
+          () => {
+            window.multiTabHistories[agentId].push({
+              role: 'assistant',
+              content: `[${perspective.senderName}]: ${fullContent}`
+            });
+            completedCount++;
+            if (completedCount === totalAgents) {
+              window.renderMultiTabHeaders();
+              const btnExport = document.getElementById('btn-export-ai');
+              if (btnExport) btnExport.style.display = 'flex';
+            }
+            finishStreaming();
+          },
+          (err) => {
+            window.multiTabHistories[agentId].push({
+              role: 'assistant',
+              content: `[${perspective.senderName}]: ❌ 错误: ${err.message}`
+            });
+            completedCount++;
+            if (completedCount === totalAgents) {
+              window.renderMultiTabHeaders();
+            }
+            finishStreaming();
+          },
+          abortController.signal
+        );
+      });
+
+      window.renderMultiTabHeaders();
+
+    } else if (currentMode === 'rotate') {
+      // ===== 🔄 轮流对话模式：逐一轮流提问 =====
+      // 初始化轮流队列
+      window.rotateQueue = [];
+      checkedAgentCbs.forEach(cb => {
+        window.rotateQueue.push(cb.value);
+      });
+      window.rotateCurrentIndex = 0;
+
+      // 执行当前轮次
+      window.executeRotateTurn = function() {
+        if (abortController.signal.aborted) {
+          finishStreaming();
+          return;
+        }
+        if (window.rotateCurrentIndex >= window.rotateQueue.length) {
+          // 所有专家回答完毕
+          appendDynamicFollowUpSuggestions();
+          if (typeof window.autoArchiveCurrentChat === 'function') window.autoArchiveCurrentChat();
           const btnExport = document.getElementById('btn-export-ai');
           if (btnExport) btnExport.style.display = 'flex';
-        },
-        (err) => {
-          contentArea.innerHTML = `<span style="color: #ea4335; font-weight: 600;">❌ [${perspective.senderName}] 诊断中断: ${err.message}</span>`;
-          completedCount++;
-          if (completedCount === totalAgents) {
-            appendDynamicFollowUpSuggestions();
-          }
+          finishStreaming();
+          return;
         }
-      );
-    });
+
+        const agentId = window.rotateQueue[window.rotateCurrentIndex];
+        const perspective = window.PERSPECTIVES[agentId];
+        if (!perspective) {
+          window.rotateCurrentIndex++;
+          window.executeRotateTurn();
+          return;
+        }
+
+        const personaSystemInstruction = perspective.personaPrompt;
+
+        const aiBubble = appendChatBubble('ai', '');
+        const contentArea = aiBubble.querySelector('.bubble-text');
+        const thinkingArea = aiBubble.querySelector('.thinking-body');
+        const thinkingContainer = aiBubble.querySelector('.thinking-container');
+
+        const bubbleHeader = document.createElement('div');
+        bubbleHeader.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--primary); margin-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.04); padding-bottom:4px;';
+        bubbleHeader.innerHTML = `${perspective.avatarSvg || '🧠'} <span>${perspective.senderName} (${perspective.icon}) — 第 ${window.rotateCurrentIndex + 1}/${window.rotateQueue.length} 位</span>`;
+        aiBubble.insertBefore(bubbleHeader, aiBubble.firstChild);
+
+        const agentHistory = window.aiMessageHistory.filter(m => m.role !== 'assistant').concat(
+          window.aiMessageHistory.filter(m => m.role === 'assistant' && m.content.startsWith(`[${perspective.senderName}]`))
+        );
+
+        const payload = {
+          messages: agentHistory,
+          model: selectedModel,
+          contextMode,
+          currentNoteId: currentSelectedNote?.id,
+          currentCategory: activeCategoryName,
+          systemInstruction: personaSystemInstruction
+        };
+
+        let fullContent = '';
+        let fullReasoning = '';
+        contentArea.innerHTML = `<span class="typing-loading" style="color: var(--text-muted); font-style: italic;">${perspective.senderName} 正在分析研究，请稍候...</span>`;
+
+        ApiClient.chatStream(
+          payload,
+          (chunk) => {
+            if (chunk.reasoning) {
+              if (thinkingContainer) thinkingContainer.style.display = 'block';
+              fullReasoning += chunk.reasoning;
+              if (thinkingArea) thinkingArea.innerHTML = marked.parse(fullReasoning);
+            }
+            if (chunk.content) {
+              const loading = contentArea.querySelector('.typing-loading');
+              if (loading) loading.remove();
+              fullContent += chunk.content;
+              contentArea.innerHTML = marked.parse(fullContent);
+            }
+            aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+          },
+          () => {
+            window.aiMessageHistory.push({
+              role: 'assistant',
+              content: `[${perspective.senderName}]: ${fullContent}`
+            });
+            window.rotateCurrentIndex++;
+            window.executeRotateTurn();
+          },
+          (err) => {
+            contentArea.innerHTML = `<span style="color: #ea4335; font-weight: 600;">❌ [${perspective.senderName}] 诊断中断: ${err.message}</span>`;
+            window.rotateCurrentIndex++;
+            window.executeRotateTurn();
+          },
+          abortController.signal
+        );
+      };
+
+      window.__pendingStreams++;
+      window.executeRotateTurn();
+    }
 
   } else {
     // 2. 🧠 普通单专家的回答工作流
@@ -820,6 +1330,7 @@ async function handleStreamingSend() {
     const loadingText = perspective ? perspective.loadingText : '正在全栈检索历史便签，思考中...';
     contentArea.innerHTML = `<span class="typing-loading" style="color: var(--text-muted); font-style: italic;">${senderName} ${loadingText}</span>`;
 
+    window.__pendingStreams++;
     ApiClient.chatStream(
       payload,
       (chunk) => {
@@ -850,10 +1361,13 @@ async function handleStreamingSend() {
         //对话完成，注入后续问题卡片
         appendDynamicFollowUpSuggestions();
         if (typeof window.autoArchiveCurrentChat === 'function') window.autoArchiveCurrentChat();
+        finishStreaming();
       },
       (err) => {
         contentArea.innerHTML = `<span style="color: #ea4335; font-weight: 600;">❌ 灵魂对话中断: ${err.message}</span>`;
-      }
+        finishStreaming();
+      },
+      abortController.signal
     );
   }
 }
@@ -1118,6 +1632,7 @@ async function syncLocalToCloud() {
       window.importedFiles = importedFiles;
 
       await loadNotesFromDB();
+      await loadSyncHistory();
     } catch (err) {
       alert('云端同步失败: ' + err.message);
     } finally {
