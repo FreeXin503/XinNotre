@@ -147,7 +147,7 @@
 | D4 · import_voice | ✅ | voiceImport.js / aiProviderService.js / config/index.js / importController.js / import.js |
 | D5 · multiplayer_relation | ✅ | relationshipService.js / mindGalaxyController.js / mindGalaxy.js / relationship.js / index.js / migrations_v10.sql |
 | D6 · multiplayer_group | ✅ | aggregateService.js / aggregator.js / migrations_v11.sql / controller/routes |
-| D7 · ai_galaxy_guide | ⬜ | |
+| D7 · ai_galaxy_guide | ✅ | galaxyGuideService.js / mindGalaxyGuideController.js / nlpDeepService.js / index.js / routes |
 | D8 · ai_socratic | ⬜ | |
 | D9 · ai_belief_check | ⬜ | |
 | D10 · digital_twin_evolve | ⬜ | |
@@ -215,3 +215,15 @@
   - aggregate.enabled 默认 false，环境变量 AGGREGATE_ENABLED=true 开启
   - 纯 map-reduce 聚合，不调 LLM，批量 body 超 10MB 拒绝
 - **下一步**：D7 AI 星系向导 SSE 对话
+
+### 2026-06-28：D7 AI 星系向导 SSE 对话完成
+
+- **改动文件**：galaxyGuideService.js, mindGalaxyGuideController.js, nlpDeepService.js, mindGalaxy.js, index.js
+- **关键决策**：
+  - 独立 controller（mindGalaxyGuideController.js）不复用 aiController，保持 route 无 RAG 耦合
+  - LLM 输出解析：`【ACTION:{"bodyId":"...","action":"focus"}】` 特殊 JSON 标记由 onChunk 实时解析
+  - 前端 SSE 流式读取 `event: text` → 逐步显示，`event: action` → focus/highlight/timeline
+  - `/focus <bodyId>` `/highlight <bodyId>` 命令模式不走 LLM
+  - context prompt ≤ 200 字（星系类型 + top5 信念 + top5 人物 + 星体总数）
+  - localMode 降级：基于关键词匹配的模板回答，不调 LLM
+- **下一步**：D8 苏格拉底式反思引导
