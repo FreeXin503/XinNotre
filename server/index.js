@@ -10,6 +10,7 @@ import { ensureCollection } from './services/vectorStore.js';
 import { assertKeyReady } from './services/cryptoService.js';
 import { initSkillCache } from './services/skillCacheService.js';
 import { viewSharedReport } from './controllers/shareController.js';
+import { startDigitalTwinCron } from './services/mindGalaxy/digitalTwinService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,6 +100,7 @@ async function startServer() {
     await ensureCollection();
     startAutoSync();
     console.log('[vectorSync] Background sync enabled');
+    await startDigitalTwinCron();
     
     app.listen(PORT, () => {
       console.log(`====================================================`);

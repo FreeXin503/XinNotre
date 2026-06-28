@@ -15,6 +15,7 @@ import {
 import { aiGuideStream } from '../controllers/mindGalaxyGuideController.js';
 import { startSocraticSession, socraticStepHandler } from '../controllers/socraticController.js';
 import { checkBeliefHandler, getBeliefHistoryHandler } from '../controllers/beliefCheckController.js';
+import { evolveDigitalTwinHandler, chatWithPastSelfHandler, listDigitalTwinsHandler } from '../controllers/digitalTwinController.js';
 
 const router = Router();
 
@@ -84,5 +85,10 @@ router.post('/socratic/step', authMiddleware, socraticStepHandler);
 // ── D9 信念检验 ──
 router.post('/belief-check', authMiddleware, checkBeliefHandler);
 router.get('/belief-check/history', authMiddleware, getBeliefHistoryHandler);
+
+// ── D10 数字心智 ──
+router.post('/digital-twin/evolve', authMiddleware, evolveDigitalTwinHandler);
+router.get('/digital-twin/list', authMiddleware, listDigitalTwinsHandler);
+router.post('/digital-twin/chat', authMiddleware, chatWithPastSelfHandler);
 
 export default router;

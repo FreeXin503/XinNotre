@@ -64,6 +64,7 @@ export async function initDatabase() {
     { version: 'migrations_v11',     name: 'v11 aggregate_sessions' },
     { version: 'migrations_v12',     name: 'v12 socratic_sessions' },
     { version: 'migrations_v13',     name: 'v13 belief_checks' },
+    { version: 'migrations_v14',     name: 'v14 digital_twin_snapshots' },
   ];
 
   try {

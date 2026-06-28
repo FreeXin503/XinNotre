@@ -49,5 +49,11 @@ export const config = Object.freeze({
   // D6 多人匿名聚合星系
   aggregate: {
     enabled: process.env.AGGREGATE_ENABLED === 'true'
+  },
+
+  // D10 数字心智持续演化
+  digitalTwin: {
+    enabled: process.env.DIGITAL_TWIN_ENABLED !== 'false',
+    cron: process.env.DIGITAL_TWIN_CRON || '0 3 * * *'
   }
 });
