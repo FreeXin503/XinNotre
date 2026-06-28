@@ -62,6 +62,7 @@ export async function initDatabase() {
     { version: 'migrations_v9',      name: 'v9 notes meta_json + source_type extend' },
     { version: 'migrations_v10',     name: 'v10 relationship_invitations' },
     { version: 'migrations_v11',     name: 'v11 aggregate_sessions' },
+    { version: 'migrations_v12',     name: 'v12 socratic_sessions' },
   ];
 
   try {

@@ -13,6 +13,7 @@ import {
   aggregateJoin, aggregateResult
 } from '../controllers/mindGalaxyController.js';
 import { aiGuideStream } from '../controllers/mindGalaxyGuideController.js';
+import { startSocraticSession, socraticStepHandler } from '../controllers/socraticController.js';
 
 const router = Router();
 
@@ -74,5 +75,9 @@ router.get('/aggregate/result', authMiddleware, aggregateResult);
 
 // ── D7 星系向导 ──
 router.post('/ai-guide', authMiddleware, aiGuideStream);
+
+// ── D8 苏格拉底反思引导 ──
+router.post('/socratic/start', authMiddleware, startSocraticSession);
+router.post('/socratic/step', authMiddleware, socraticStepHandler);
 
 export default router;

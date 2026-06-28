@@ -979,6 +979,10 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23,7 16,12 23,17 23,7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
       <span class="ctrl-tooltip">视频</span>
     </button>
+    <button class="ctrl-btn" id="btn-socratic" title="苏格拉底引导" style="border-color:hsla(120,50%,50%,0.3);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="12" y2="13"/></svg>
+      <span class="ctrl-tooltip">苏格拉底</span>
+    </button>
   </div>
 </div>
 
@@ -1099,9 +1103,105 @@ body {
 <!-- Tooltip -->
 <div id="tooltip"><div class="tt-name"></div><div class="tt-type"></div></div>
 
+<!-- Socratic Panel -->
+<div id="socratic-panel">
+  <div class="socratic-header">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    苏格拉底式反思
+    <button class="socratic-close" id="socratic-close">&times;</button>
+  </div>
+  <div class="socratic-stage" id="socratic-stage-indicator"></div>
+  <div class="socratic-output" id="socratic-output">
+    <div class="socratic-prompt">你想探索什么？输入一个让你困惑的话题。</div>
+  </div>
+  <div id="socratic-topic-area">
+    <textarea id="socratic-topic" placeholder="例如：我是不是不够好？..." rows="2"></textarea>
+    <button id="socratic-start" class="socratic-btn">开始探索</button>
+  </div>
+  <div id="socratic-input-area" style="display:none;">
+    <textarea id="socratic-input" placeholder="回应引导者的问题..." rows="2"></textarea>
+    <button id="socratic-send" class="socratic-btn">发送</button>
+  </div>
+</div>
+
+<style>
+#socratic-panel {
+  position: fixed; right: -380px; top: 60px; width: 360px; max-height: 80vh;
+  background: hsla(240,20%,8%,0.96); border: 1px solid hsla(120,40%,40%,0.3);
+  border-radius: 12px 0 0 12px; z-index: 100;
+  display: flex; flex-direction: column;
+  transition: right 0.3s ease;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+}
+#socratic-panel.visible { right: 0; }
+.socratic-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 16px; border-bottom: 1px solid hsla(120,30%,30%,0.2);
+  color: #8f8; font-size: 0.9rem; font-weight: 600;
+}
+.socratic-close {
+  margin-left: auto; background: none; border: none; color: #666;
+  cursor: pointer; font-size: 1.2rem; padding: 0 4px;
+}
+.socratic-close:hover { color: #f88; }
+.socratic-stage {
+  padding: 6px 16px; font-size: 0.7rem; color: #aaa;
+  display: flex; align-items: center; gap: 4px;
+  background: hsla(120,20%,15%,0.3);
+}
+.stage-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #444; display: inline-block;
+}
+.stage-dot.active { background: #8f8; box-shadow: 0 0 6px #8f8; }
+.stage-dot.done { background: #4a4; }
+.stage-label { margin-left: 8px; color: #8f8; }
+.socratic-output {
+  flex: 1; overflow-y: auto; padding: 12px 16px;
+  min-height: 200px; max-height: 50vh;
+}
+.socratic-msg { margin-bottom: 12px; }
+.socratic-name { font-size: 0.7rem; color: #888; margin-bottom: 2px; }
+.socratic-content p { margin: 2px 0; color: #ddd; font-size: 0.85rem; line-height: 1.5; }
+.socratic-user .socratic-content p { color: #8cf; }
+.socratic-stage-tag {
+  display: inline-block; font-size: 0.6rem; padding: 1px 6px;
+  border-radius: 8px; background: hsla(120,30%,25%,0.4); color: #8f8;
+  margin-bottom: 4px;
+}
+.socratic-thinking, .socratic-prompt {
+  color: #888; font-size: 0.85rem; font-style: italic; padding: 8px 0;
+}
+.socratic-error { color: #f88; font-size: 0.85rem; }
+.socratic-done { color: #8f8; font-size: 0.8rem; text-align: center; padding: 12px; border-top: 1px solid hsla(120,30%,25%,0.3); margin-top: 8px; }
+.socratic-btn {
+  padding: 6px 16px; background: hsla(120,40%,35%,0.6); color: #fff;
+  border: 1px solid hsla(120,40%,40%,0.5); border-radius: 6px;
+  cursor: pointer; font-size: 0.8rem;
+}
+.socratic-btn:hover { background: hsla(120,40%,40%,0.8); }
+#socratic-topic-area, #socratic-input-area {
+  padding: 8px 16px 12px; display: flex; gap: 8px;
+  border-top: 1px solid hsla(120,20%,20%,0.3);
+}
+#socratic-topic, #socratic-input {
+  flex: 1; background: hsla(240,15%,12%,0.8); border: 1px solid hsla(120,20%,25%,0.3);
+  border-radius: 6px; color: #ddd; padding: 8px; font-size: 0.8rem;
+  font-family: inherit; resize: none;
+}
+#socratic-topic:focus, #socratic-input:focus { outline: none; border-color: hsla(120,40%,40%,0.6); }
+</style>
+
 <script type="module">
   import { mountMindGalaxy } from './js/modules/mindGalaxy/index.js';
+  import { initSocratic, disposeSocratic } from './js/modules/mindGalaxy/socratic.js';
+
   mountMindGalaxy();
+  initSocratic();
+
+  document.getElementById('socratic-close')?.addEventListener('click', () => {
+    document.getElementById('socratic-panel').classList.remove('visible');
+  });
 </script>
 </body>
 </html>
