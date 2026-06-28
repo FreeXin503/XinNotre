@@ -144,6 +144,28 @@ async function main() {
         ok('清理标签');
       } catch (e) { fail('清理标签', e.message); }
     }
+
+    // 测试 8: 创新玩法模块端点可达性
+    const MODULE_ENDPOINTS = [
+      { method: 'GET', path: '/archaeology/cards', name: 'A1 便签考古盲盒' },
+      { method: 'GET', path: '/persona/history', name: 'B1 灵魂人格档案' },
+      { method: 'GET', path: '/weather/grid?year=2026', name: 'A2 情绪天气图' },
+      { method: 'GET', path: '/goals', name: 'B2 成长证据树' },
+      { method: 'GET', path: '/almanac/list', name: 'D1 生命年报卷宗' },
+      { method: 'GET', path: '/penpal/threads', name: 'C1 跨时空笔友' },
+      { method: 'GET', path: '/letters', name: 'C2 时光胶囊' },
+      { method: 'GET', path: '/memoir/', name: 'D2 主题回忆录' }
+    ];
+    for (const ep of MODULE_ENDPOINTS) {
+      try {
+        const { status, data } = await api(ep.method, ep.path, null, token);
+        if (status >= 200 && status < 500 && data && typeof data.success !== 'undefined') {
+          ok(`${ep.name} (${ep.path})`);
+        } else {
+          fail(ep.name, `status=${status} body=${JSON.stringify(data).slice(0, 80)}`);
+        }
+      } catch (e) { fail(ep.name, e.message); }
+    }
   }
 
   console.log(`\n===== \u6d4b\u8bd5\u7ed3\u679c =====`);

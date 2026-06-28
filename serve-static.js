@@ -458,6 +458,71 @@ const MOCK_API = {
       generatedAt: new Date().toISOString()
     },
     timestamp: new Date().toISOString()
+  }),
+
+  // A1 便签考古盲盒 Mock API
+  '/api/archaeology/dig': () => ({
+    success: true,
+    data: {
+      card: { id: 1, noteId: 'mock-1', digMode: 'random', noteContent: '这是挖掘出的便签内容示例…', noteDate: '2024-03-15', noteCategory: '生活', noteTitle: 'mock 标题' },
+      coKeywords: ['成长', '感悟', '日常'],
+      relatedNotes: [{ id: 2, title: '相关便签1', content: '…' }]
+    },
+    timestamp: new Date().toISOString()
+  }),
+  '/api/archaeology/cards': () => ({
+    success: true,
+    data: { cards: [] },
+    timestamp: new Date().toISOString()
+  }),
+
+  // B1 灵魂人格档案 Mock API
+  '/api/persona/history': () => ({
+    success: true,
+    data: { snapshots: [] },
+    timestamp: new Date().toISOString()
+  }),
+
+  // A2 情绪天气图 Mock API
+  '/api/weather/grid': () => ({
+    success: true,
+    data: { year: 2026, layer: 'emotion', days: [], legend: [] },
+    timestamp: new Date().toISOString()
+  }),
+
+  // B2 成长证据树 Mock API
+  '/api/goals': () => ({
+    success: true,
+    data: { goals: [] },
+    timestamp: new Date().toISOString()
+  }),
+
+  // D1 生命年报卷宗 Mock API
+  '/api/almanac/list': () => ({
+    success: true,
+    data: { volumes: [] },
+    timestamp: new Date().toISOString()
+  }),
+
+  // C1 跨时空笔友 Mock API
+  '/api/penpal/threads': () => ({
+    success: true,
+    data: { threads: [] },
+    timestamp: new Date().toISOString()
+  }),
+
+  // C2 时光胶囊 Mock API
+  '/api/letters': () => ({
+    success: true,
+    data: { letters: [] },
+    timestamp: new Date().toISOString()
+  }),
+
+  // D2 主题回忆录 Mock API
+  '/api/memoir/': () => ({
+    success: true,
+    data: { memoirs: [] },
+    timestamp: new Date().toISOString()
   })
 };
 

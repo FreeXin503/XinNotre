@@ -454,6 +454,62 @@ export const ApiClient = {
     });
   },
 
+  // ── C1 跨时空笔友 ──
+  async listPenpalThreads() {
+    return this.request('/penpal/threads', { headers: this.getHeaders() });
+  },
+  async createPenpalThread(data) {
+    return this.request('/penpal/threads', {
+      method: 'POST', headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+  },
+  subscribePenpalMessage(threadId, payload, handlers) {
+    return this._sse(`/penpal/threads/${threadId}/messages`, {
+      method: 'POST', body: JSON.stringify(payload),
+      signal: handlers?.signal
+    }, handlers);
+  },
+  async getPenpalLetters(threadId) {
+    return this.request(`/penpal/threads/${threadId}/letters`, { headers: this.getHeaders() });
+  },
+
+  // ── C2 时光胶囊 ──
+  async createLetter(data) {
+    return this.request('/letter', {
+      method: 'POST', headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+  },
+  async listLetters() {
+    return this.request('/letters', { headers: this.getHeaders() });
+  },
+  subscribeOpenLetter(id, handlers) {
+    return this._sse(`/letter/${id}/open`, {
+      method: 'GET', headers: this.getHeaders(),
+      signal: handlers?.signal
+    }, handlers);
+  },
+
+  // ── D2 主题回忆录 ──
+  async listMemoirs() {
+    return this.request('/memoir/', { headers: this.getHeaders() });
+  },
+  subscribeGenerateMemoir(payload, handlers) {
+    return this._sse('/memoir/generate', {
+      method: 'POST', body: JSON.stringify(payload),
+      signal: handlers?.signal
+    }, handlers);
+  },
+  async getMemoirExport(memoirId) {
+    return this.request(`/memoir/${memoirId}/export`, { headers: this.getHeaders() });
+  },
+  async publishMemoir(memoirId) {
+    return this.request(`/memoir/${memoirId}/publish`, {
+      method: 'POST', headers: this.getHeaders()
+    });
+  },
+
   // ── E3 Mind Cosmos Snapshot ──
   async getCosmosSnapshot(params = {}) {
     const q = new URLSearchParams();

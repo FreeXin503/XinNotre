@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -187,6 +187,24 @@
                         <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
                         <polyline points="7 23 3 19 7 15"></polyline>
                         <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                    </svg>
+                </button>
+                <button class="icon-rail-btn" id="btn-rail-penpal" title="跨时空笔友" onclick="switchToInnovationView('penpal')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </button>
+                <button class="icon-rail-btn" id="btn-rail-letter" title="时光胶囊" onclick="switchToInnovationView('letter')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="4"></rect>
+                        <line x1="2" y1="6" x2="12" y2="12" stroke-width="2"></line>
+                        <line x1="22" y1="6" x2="12" y2="12" stroke-width="2"></line>
+                    </svg>
+                </button>
+                <button class="icon-rail-btn" id="btn-rail-memoir" title="主题回忆录" onclick="switchToInnovationView('memoir')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                     </svg>
                 </button>
                 <button class="icon-rail-btn" id="btn-rail-mind-galaxy" title="心智星系 Mind Galaxy" onclick="window.open('mind-galaxy.html', '_blank')">
@@ -662,6 +680,15 @@
 
             <!-- B2 Growth Evidence Tree -->
             <div id="view-growthTree" class="innovation-view" style="display: none; flex:1; overflow-y:auto; padding:32px 40px;"></div>
+
+            <!-- C1 Cross-Time Penpal -->
+            <div id="view-penpal" class="innovation-view" style="display: none; flex:1; overflow-y:auto; padding:32px 40px;"></div>
+
+            <!-- C2 Time Capsule Letters -->
+            <div id="view-letter" class="innovation-view" style="display: none; flex:1; overflow-y:auto; padding:32px 40px;"></div>
+
+            <!-- D2 Themed Memoir -->
+            <div id="view-memoir" class="innovation-view" style="display: none; flex:1; overflow-y:auto; padding:32px 40px;"></div>
 
             <!-- AI 灵魂对话视图 (Centered Viewport) -->
             <div id="ai-chat-view" style="display: flex;">
@@ -5011,14 +5038,17 @@ ${n.content.substring(0, 1500)}${n.content.length > 1500 ? '\n(……已省略�
       const notesPanel = document.querySelector('.notes-panel');
       const readerPanel = document.getElementById('reader-panel');
       const aiChatView = document.getElementById('ai-chat-view');
-      const allViews = ['view-archaeology','view-persona','view-emotionWeather','view-almanac','view-growthTree'];
+      const allViews = ['view-archaeology','view-persona','view-emotionWeather','view-almanac','view-growthTree','view-penpal','view-letter','view-memoir'];
 
       const viewMap = {
         archaeology: { el: document.getElementById('view-archaeology'), mod: './js/modules/archaeology.js', mount: 'mountArchaeology' },
         persona: { el: document.getElementById('view-persona'), mod: './js/modules/persona.js', mount: 'mountPersona' },
         emotionWeather: { el: document.getElementById('view-emotionWeather'), mod: './js/modules/emotionWeather.js', mount: 'mountEmotionWeather' },
         almanac: { el: document.getElementById('view-almanac'), mod: './js/modules/almanac.js', mount: 'mountAlmanac' },
-        growthTree: { el: document.getElementById('view-growthTree'), mod: './js/modules/growthTree.js', mount: 'mountGrowthTree' }
+        growthTree: { el: document.getElementById('view-growthTree'), mod: './js/modules/growthTree.js', mount: 'mountGrowthTree' },
+        penpal: { el: document.getElementById('view-penpal'), mod: './js/modules/penpal.js', mount: 'mountPenpal' },
+        letter: { el: document.getElementById('view-letter'), mod: './js/modules/letter.js', mount: 'mountLetter' },
+        memoir: { el: document.getElementById('view-memoir'), mod: './js/modules/memoir.js', mount: 'mountMemoir' }
       };
 
       // Hide all innovation views

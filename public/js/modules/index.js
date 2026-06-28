@@ -14,6 +14,9 @@ import { mountAlmanac } from './almanac.js';
 import { mountNightLetter, unmountNightLetter } from './nightLetter.js';
 import { mountThoughtSpectrum, unmountThoughtSpectrum } from './thoughtSpectrum.js';
 import { mountCosmos, unmountCosmos } from './cosmos.js';
+import { mountPenpal, unmountPenpal } from './penpal.js';
+import { mountLetter, unmountLetter } from './letter.js';
+import { mountMemoir, unmountMemoir } from './memoir.js';
 
 // ── 模块注册表 ──────────────────────────────────────────
 
@@ -71,6 +74,21 @@ export const MODULE_REGISTRY = {
     mount: mountCosmos,
     unmount: unmountCosmos,
     label: '🌀 心智星相图'
+  },
+  'penpal': {
+    mount: mountPenpal,
+    unmount: unmountPenpal,
+    label: '✉️ 跨时空笔友'
+  },
+  'letter': {
+    mount: mountLetter,
+    unmount: unmountLetter,
+    label: '📮 时光胶囊'
+  },
+  'memoir': {
+    mount: mountMemoir,
+    unmount: unmountMemoir,
+    label: '📖 主题回忆录'
   }
 };
 
