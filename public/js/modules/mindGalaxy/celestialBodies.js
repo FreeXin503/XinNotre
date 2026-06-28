@@ -102,28 +102,29 @@ function createStarCommon(body, emissiveBoost = 1) {
   const T = THREE();
   const group = new T.Group();
   const r = body.visual?.radius || 2;
-  const color = hexToColor(body.visual?.colorHex || '#FFD700');
+  const colorHex = body.visual?.colorHex || '#FFD700';
+  const color = hexToColor(colorHex);
 
-  const tex = generateStarSurfaceTexture(0.15);
-  const geo = new T.SphereGeometry(r, 48, 48);
+  const tempHSL = {};
+  color.getHSL(tempHSL);
+  const hue = tempHSL.h * 360;
+
+  const tex = generateStarSurfaceTexture(hue, 512);
+  const geo = new T.SphereGeometry(r, 64, 64);
   const mat = new T.MeshStandardMaterial({
     map: tex,
     color,
     emissive: color,
-    emissiveIntensity: (body.visual?.emissiveIntensity || 1) * emissiveBoost,
-    roughness: 0.3,
+    emissiveIntensity: (body.visual?.emissiveIntensity || 1) * emissiveBoost * 1.5,
+    roughness: 0.4,
     metalness: 0.1
   });
   const mesh = new T.Mesh(geo, mat);
   mesh.castShadow = false;
   group.add(mesh);
 
-  // Glow layers
-  const glowSizes = [r * 2.5, r * 4, r * 6];
-  const glowOps = [0.5, 0.25, 0.1];
-  for (let i = 0; i < 3; i++) {
-    createGlow(group, body.visual?.colorHex || '#FFD700', glowSizes[i], glowOps[i]);
-  }
+  createGlow(group, colorHex, r * 5, 0.6);
+  createGlow(group, colorHex, r * 9, 0.2);
 
   return { group, mesh, r, color };
 }
@@ -154,19 +155,26 @@ export function createPlanetSystem(body) {
   const T = THREE();
   const group = new T.Group();
   const r = body.visual?.radius || 1.5;
-  const color = hexToColor(body.visual?.colorHex || '#4488CC');
+  const colorHex = body.visual?.colorHex || '#4488CC';
+  const color = hexToColor(colorHex);
 
-  const geo = new T.SphereGeometry(r, 32, 32);
-  const mat = new T.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.2 });
+  const geo = new T.SphereGeometry(r, 48, 48);
+  const mat = new T.MeshStandardMaterial({
+    color, roughness: 0.55, metalness: 0.2,
+    emissive: color, emissiveIntensity: 0.15
+  });
   const mesh = new T.Mesh(geo, mat);
   group.add(mesh);
 
-  // Atmosphere shell
-  const atmoGeo = new T.SphereGeometry(r * 1.2, 32, 32);
-  const atmoMat = new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.15, side: T.BackSide });
+  const atmoGeo = new T.SphereGeometry(r * 1.15, 48, 48);
+  const atmoMat = new T.MeshStandardMaterial({
+    color, roughness: 1, metalness: 0,
+    transparent: true, opacity: 0.12, depthWrite: false,
+    emissive: color, emissiveIntensity: 0.3
+  });
   group.add(new T.Mesh(atmoGeo, atmoMat));
 
-  createGlow(group, body.visual?.colorHex || '#4488CC', r * 3, 0.25);
+  createGlow(group, colorHex, r * 3, 0.2);
 
   group.userData = { type: 'planet_system', orbit: body.motion };
   return {

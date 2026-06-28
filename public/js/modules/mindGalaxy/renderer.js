@@ -104,7 +104,7 @@ export function initPostProcessing(rs, params = {}) {
     })
   );
   vignettePass.enabled = true;
-  vignettePass.uniforms.intensity.value = 0.25;
+  vignettePass.uniforms.intensity.value = 0.12;
   composer.addPass(vignettePass);
 
   const grainPass = new ShaderPass(
@@ -114,7 +114,7 @@ export function initPostProcessing(rs, params = {}) {
       fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float time; uniform float intensity; float random(vec2 uv) { return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453); } void main() { vec4 tex = texture2D(tDiffuse, vUv); float grain = random(vUv + time) * intensity; tex.rgb += grain; gl_FragColor = tex; }'
     })
   );
-  grainPass.enabled = true;
+  grainPass.enabled = false;
   composer.addPass(grainPass);
 
   const dofPass = new ShaderPass(

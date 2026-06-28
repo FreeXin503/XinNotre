@@ -334,7 +334,7 @@ function boot() {
   controls = rs.controls; clock = rs.clock;
   window.__mgRenderer = renderer;
 
-  const pp = initPostProcessing(rs, { strength: 0.7, radius: 0.5, threshold: 0.15 });
+  const pp = initPostProcessing(rs, { strength: 0.35, radius: 0.4, threshold: 0.3 });
   renderer.__pp = pp;
 
   createSkybox(scene);
