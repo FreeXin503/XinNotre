@@ -148,7 +148,7 @@
 | D5 · multiplayer_relation | ✅ | relationshipService.js / mindGalaxyController.js / mindGalaxy.js / relationship.js / index.js / migrations_v10.sql |
 | D6 · multiplayer_group | ✅ | aggregateService.js / aggregator.js / migrations_v11.sql / controller/routes |
 | D7 · ai_galaxy_guide | ✅ | galaxyGuideService.js / mindGalaxyGuideController.js / nlpDeepService.js / index.js / routes |
-| D8 · ai_socratic | ⬜ | |
+| D8 · ai_socratic | ✅ | socraticService.js / socratic.js / socraticController.js / migrations_v12.sql / routes / HTML |
 | D9 · ai_belief_check | ⬜ | |
 | D10 · digital_twin_evolve | ⬜ | |
 
@@ -227,3 +227,15 @@
   - context prompt ≤ 200 字（星系类型 + top5 信念 + top5 人物 + 星体总数）
   - localMode 降级：基于关键词匹配的模板回答，不调 LLM
 - **下一步**：D8 苏格拉底式反思引导
+
+### 2026-06-28：D8 苏格拉底式反思引导完成
+
+- **改动文件**：socraticService.js, socratic.js, socraticController.js, mindGalaxy.js, mind-galaxy.html, migrations_v12.sql, database.js
+- **关键决策**：
+  - 4 阶段状态机：clarify (3轮) → counterexample (2轮) → verify (2轮) → summary
+  - 服务端管理对话状态（history_json），每步持久化到 socratic_sessions
+  - prompt 模板严格约束：只提问不判断，counterexample 用"假设…会怎样？"
+  - 后处理 filterJudgmental 替换"你应该"等判断性话术为开放问题
+  - AI 不可用降级为 fallbackUtterance 模板
+  - 前端 socratic.js 管理会话生命周期：topic 输入 → 消息列表 → 阶段指示器
+- **下一步**：D9 信念系统 5 维度检验
