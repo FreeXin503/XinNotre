@@ -150,7 +150,7 @@
 | D7 · ai_galaxy_guide | ✅ | galaxyGuideService.js / mindGalaxyGuideController.js / nlpDeepService.js / index.js / routes |
 | D8 · ai_socratic | ✅ | socraticService.js / socratic.js / socraticController.js / migrations_v12.sql / routes / HTML |
 | D9 · ai_belief_check | ✅ | beliefCheckService.js / nlpDeepService.js / beliefCheckController.js / migrations_v13.sql / uiPanels.js |
-| D10 · digital_twin_evolve | ⬜ | |
+| D10 · digital_twin_evolve | ✅ | digitalTwinService.js / digitalTwinController.js / migrations_v14.sql / index.js / cron / config / routes |
 
 ### 2026-06-28：D1 DayOne JSON 导入完成
 
@@ -251,3 +251,17 @@
   - 至少 2 条替代信念建议
   - 前端报告面板每项信念旁「检验信念」按钮，点击展开 5 维分数 + 替代视角
 - **下一步**：D10 数字心智持续演化 + cron
+
+### 2026-06-28：D10 数字心智持续演化完成
+
+- **改动文件**：digitalTwinService.js, digitalTwinController.js, index.js, config/index.js, mindGalaxy.js, migrations_v14.sql, database.js, package.json
+- **关键决策**：
+  - 每周演化：按 ISO 周切分 epoch（周一至周日），每周仅生成一次快照
+  - 演化流程：data_sources → preprocess → nlpBasic → nlpDeep → persona_json
+  - persona_json 存储 top5 情绪、top3 信念、top5 话题
+  - cron 表达式 `0 3 * * *`，通过 `_digitalTwinCronStarted` 全局标志防重复注册
+  - past-self chat 以 epoch persona_json 为 system prompt，第一人称回答
+  - digitalTwin.enabled 默认 true，设置 `DIGITAL_TWIN_ENABLED=false` 关闭
+  - 单用户 cron 失败隔离（try/catch 单循环），不影响其他用户
+  - 无新数据 → skip 不创建，同一 epoch 重复请求 → skip「本周已演化」
+- **下一步**：批 4 全部完成，可进行最终核验
