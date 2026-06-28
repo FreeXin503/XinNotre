@@ -118,4 +118,23 @@
 
 ### 核心工程里程碑：44/44 ✅ 全部完成
 
+---
+
+## 批 3.5 · Bug 修复（F1-F3）
+
+| 卡片 | 状态 | 文件 |
+|------|------|------|
+| F1 · backend_critical_fix | ✅ | exportService.js / mindGalaxyRepository.js / shareController.js / mindGalaxyController.js / migrations_v8.sql |
+| F3 · lifecycle_fix | ✅ | index.js / mindGalaxyController.js |
+| F2 · frontend_xss_interaction | ✅ | interaction.js / uiPanels.js / exporter.js / cosmos.js |
+
+### 关键修复
+
+- **exportService.js**: 删除重复 `const beliefs` 解决 SyntaxError；`pageAdded` 监听前移至 `doc.pipe` 后（全页页码）；try/finally 包装（异常时 doc.end()）
+- **mindGalaxyRepository.js**: `getSnapshotById(snapshotId)` 重命名为 `getSnapshotByIdPublic`，新增 `updateSnapshotJson`
+- **shareController.js**: `Math.random` token 替换为 `crypto.randomBytes(16).toString('base64url')`
+- **mindGalaxyController.js**: `getReport` 传 `userId` 防越权；`setPrivacySettings` localMode 分支合并旧配置；编辑端点改走 `updateSnapshotJson`
+- **index.js**: `_transitionRAF` 变量 + unmount 取消；`__mgSnapshot` 两分支统一；`bodyBaseStates` 过渡后重建；step 函数 `!mounted` 守卫
+- **mindGalaxyController.js**: SSE 端点添加 `req.on('close')` abort 处理
+
 剩余 D1-D10 批4 为远期可选功能（导入/多人/数字孪生等），计划另行规划。
