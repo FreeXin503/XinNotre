@@ -93,17 +93,18 @@
 
 ## Git 状态
 
-最新提交：`8e2b88f` — feat(mind-galaxy): batch 1 complete — C29-C35 privacy/edit/config
+最新提交：`9d8b165` — feat(mind-galaxy): batch 2 complete — B3-B8 + C10/C12/C17/C23
 
 ### 提交历史
 
 | Hash | 消息 |
 |------|------|
+| `9d8b165` | feat(mind-galaxy): batch 2 complete — B3-B8 + C10/C12/C17/C23 |
+| `79bf9ca` | docs: mark batch 1 complete, update PROGRESS.md milestone |
 | `8e2b88f` | feat(mind-galaxy): batch 1 complete — C29-C35 privacy/edit/config |
 | `aa21b15` | feat(config): add SESSION_CONSTITUTION.md with commit-at-checkpoint rules |
 | `ab50001` | feat(mind-galaxy): batch 1 complete — C19-C22 render + C9,C11,C24 export/import |
 | `915c654` | feat(mind-galaxy): 批1 first half — B1,B2,B5交互 + C13-C16,C27,C28 NLP |
-| `9703df8` | feat: frontend modules, project config & documentation |
 
 ---
 
@@ -111,26 +112,8 @@
 
 ### 当前进度
 
-- **Phase 0 (A1-A10)**: ✅ 全部完成
-- **Phase 1-3 (批1)**: ✅ 23/23 全部完成
-- **批2 (9 cards)**: B3, B4, B6, B7, B8, C17, C10, C12, C23
-- **批3 (2 cards)**: C25, C26
-- **批4 (10 cards, 可选)**: D1-D10
-
-### 批2 清单
-| Card | 内容 | 依赖 |
-|------|------|------|
-| B3 | 聚焦动画 | B2 |
-| B4 | 详情面板 (浏览/关联) | B2 |
-| B6 | 搜索/过滤 | B5 |
-| B7 | 近距视角切换 | B5 |
-| B8 | 时间轴演化播放 | B2 |
-| C17 | 演化插值 | B8 |
-| C10 | 视频导出 | P3渲染 |
-| C12 | H5分享页 | P3渲染 |
-| C23 | 报告图表生成 | C13-C28 |
-
-### 会话宪法已落地
-- 每完成一张卡自动执行收尾三步（commit + plan更新 + PROGRESS.md更新）
-- 感觉上下文沉重时使用 auto_compact
-- compact 失败时硬断点，告知用户开新对话
+- **Phase 0 (A1-A10)**: ✅ 完成
+- **批1 (23 cards)**: ✅ 完成
+- **批2 (9 cards)**: ✅ 完成  
+- **批3 (2 cards)**: C25 分享模板, C26 报告点击溯源
+- **批4 (10 cards, 可选)**: D1-D10 远期扩展
