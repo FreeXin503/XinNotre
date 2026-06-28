@@ -87,7 +87,7 @@ class MindGalaxyRepository {
     return row;
   }
 
-  async getSnapshotById(snapshotId) {
+  async getSnapshotByIdPublic(snapshotId) {
     const { rows } = await this.q(
       'SELECT * FROM cosmos_snapshots WHERE id = ?',
       [snapshotId]
@@ -96,6 +96,15 @@ class MindGalaxyRepository {
     const row = rows[0];
     try { row.snapshot_json = typeof row.snapshot_json === 'string' ? JSON.parse(row.snapshot_json) : row.snapshot_json; } catch {}
     return row;
+  }
+
+  async updateSnapshotJson(id, userId, json) {
+    const j = typeof json === 'string' ? json : JSON.stringify(json);
+    const { rows } = await this.q(
+      'UPDATE cosmos_snapshots SET snapshot_json = ?, updated_at = NOW() WHERE id = ? AND user_id = ?',
+      [j, id, userId]
+    );
+    return rows.affectedRows > 0;
   }
 
   async listSnapshots(userId, limit = 12) {
@@ -227,7 +236,7 @@ class MindGalaxyRepository {
     if (!body) return false;
     if (newName.length > 20) return false;
     body.name = newName;
-    await this.saveSnapshot(userId, json);
+    await this.updateSnapshotJson(snapshot.id, userId, json);
     return true;
   }
 

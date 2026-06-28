@@ -202,7 +202,7 @@ export const getReport = asyncHandler(async (req, res) => {
   const reportJson = report.report_json || report;
 
   // C26: 注入 sourceRef — 为每条结论附星系位置和原始日记
-  const snapshot = await repo.getSnapshotById(snapshotId);
+  const snapshot = await repo.getSnapshotById(snapshotId, userId);
   if (snapshot?.snapshot_json) {
     const snapJson = typeof snapshot.snapshot_json === 'string' ? JSON.parse(snapshot.snapshot_json) : snapshot.snapshot_json;
     const bodies = snapJson.bodies || [];
@@ -304,7 +304,11 @@ export const setPrivacySettings = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { localMode, afterDelete } = req.body || {};
   if (typeof localMode !== 'undefined') {
-    await repo.saveConfig(userId, { name: '_privacy', privacyMode: localMode ? 'local' : 'cloud', id: '_privacy' });
+    const cfg = await repo.getConfig(userId, '_privacy');
+    await repo.saveConfig(userId, {
+      ...(cfg?.config_json || {}), name: '_privacy', id: '_privacy',
+      privacyMode: localMode ? 'local' : 'cloud', deleteAfterAnalysis: !!cfg?.config_json?.deleteAfterAnalysis
+    });
   }
   if (typeof afterDelete !== 'undefined') {
     const cfg = await repo.getConfig(userId, '_privacy');
@@ -351,7 +355,7 @@ export const classifyNoteToTopic = asyncHandler(async (req, res) => {
   if (!planet) return fail(res, '便签节点不存在', 404);
   planet.topicId = topicId;
   planet.manual = true;
-  await repo.saveSnapshot(userId, json);
+  await repo.updateSnapshotJson(snapshot.id, userId, json);
   return success(res, { classified: true, noteId, topicId });
 });
 
@@ -400,7 +404,7 @@ export const mergePersons = asyncHandler(async (req, res) => {
   target.meta.mergedFrom = [...(target.meta.mergedFrom || []), personIdB];
   target.intimacy = Math.max(target.intimacy || 0, source.intimacy || 0);
   json.bodies = bodies.filter(b => (b.id || b.nodeId) !== personIdB);
-  await repo.saveSnapshot(userId, json);
+  await repo.updateSnapshotJson(snapshot.id, userId, json);
   return success(res, { merged: personIdB, into: personIdA });
 });
 
@@ -416,7 +420,7 @@ export const updatePersonIntimacy = asyncHandler(async (req, res) => {
   const person = (json.bodies || []).find(b => (b.id || b.nodeId) === personId);
   if (!person || person.type !== 'person') return fail(res, '人物不存在', 404);
   person.intimacy = intimacy;
-  await repo.saveSnapshot(userId, json);
+  await repo.updateSnapshotJson(snapshot.id, userId, json);
   return success(res, { personId, intimacy });
 });
 

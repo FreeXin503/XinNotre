@@ -1,6 +1,7 @@
 import { success, fail, asyncHandler } from '../utils/response.js';
 import MindGalaxyRepository from '../repositories/mindGalaxyRepository.js';
 import { query } from '../config/database.js';
+import { randomBytes } from 'crypto';
 
 const repo = new MindGalaxyRepository();
 
@@ -33,7 +34,7 @@ export const getSharedSnapshot = asyncHandler(async (req, res) => {
     return fail(res, '分享链接已过期', 410);
   }
 
-  const snapshot = await repo.getSnapshotById(row.snapshot_id);
+  const snapshot = await repo.getSnapshotByIdPublic(row.snapshot_id);
   if (!snapshot) return fail(res, '快照数据不存在', 404);
 
   const json = typeof snapshot.snapshot_json === 'string'
@@ -43,10 +44,5 @@ export const getSharedSnapshot = asyncHandler(async (req, res) => {
 });
 
 function generateToken() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 32; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  return randomBytes(16).toString('base64url');
 }

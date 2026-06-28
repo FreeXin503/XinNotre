@@ -110,9 +110,18 @@ export async function exportReportPDF(userId, reportId, writable) {
 
   doc.pipe(writable);
 
-  const pageW = doc.page.width - 90;
+  let pageNum = 1;
+  doc.on('pageAdded', () => {
+    pageNum++;
+    font(doc, hasFont, 8);
+    doc.fillColor(hasFont ? '#6b84a8' : '#aaa');
+    doc.text(`— ${pageNum} —`, 45, doc.page.height - 40, { align: 'center', width: doc.page.width - 90 });
+  });
 
-  // Cover
+  try {
+    const pageW = doc.page.width - 90;
+
+    // Cover
   const f = (size, style) => font(doc, hasFont, size, style);
 
   // Title block
@@ -181,7 +190,6 @@ export async function exportReportPDF(userId, reportId, writable) {
   }
 
   // ── C23: 信念结构树图 ──
-  const beliefs = (report.coreBeliefs || []);
   if (beliefs.length > 0) {
     ensureSpace(beliefs.length * 25 + 30);
     doc.moveDown(0.5);
@@ -458,15 +466,9 @@ export async function exportReportPDF(userId, reportId, writable) {
   }
 
   // Footer on each page
-  let pageNum = 1;
-  doc.on('pageAdded', () => {
-    pageNum++;
-    f(8);
-    doc.fillColor(hasFont ? '#6b84a8' : '#aaa');
-    doc.text(`— ${pageNum} —`, 45, doc.page.height - 40, { align: 'center', width: pageW });
-  });
-
-  doc.end();
+  } finally {
+    doc.end();
+  }
 }
 
 export default { exportData, exportReportPDF };
