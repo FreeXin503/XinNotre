@@ -9,7 +9,8 @@ import {
   renameBody, classifyNoteToTopic, setBodyVisibility, getHiddenBodies,
   mergePersons, updatePersonIntimacy, listPersons,
   inviteRelationship, acceptRelationship, revokeRelationship,
-  listRelationshipInvitations, getRelationshipGraphHandler
+  listRelationshipInvitations, getRelationshipGraphHandler,
+  aggregateJoin, aggregateResult
 } from '../controllers/mindGalaxyController.js';
 
 const router = Router();
@@ -65,5 +66,9 @@ router.post('/relationship/accept/:invId', authMiddleware, acceptRelationship);
 router.post('/relationship/revoke/:invId', authMiddleware, revokeRelationship);
 router.get('/relationship/list', authMiddleware, listRelationshipInvitations);
 router.get('/relationship/graph/:token', getRelationshipGraphHandler);
+
+// ── D6 多人匿名聚合 ──
+router.post('/aggregate/join', authMiddleware, aggregateJoin);
+router.get('/aggregate/result', authMiddleware, aggregateResult);
 
 export default router;

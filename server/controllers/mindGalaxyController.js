@@ -479,6 +479,25 @@ export const getRelationshipGraphHandler = asyncHandler(async (req, res) => {
   return success(res, graph);
 });
 
+// ── D6 多人匿名聚合 ──
+import { joinSession, getAggregateResult } from '../services/mindGalaxy/aggregateService.js';
+
+export const aggregateJoin = asyncHandler(async (req, res) => {
+  const { sessionId, anonymousPayload } = req.body;
+  if (!sessionId || !anonymousPayload) {
+    return fail(res, '缺少 sessionId 或 anonymousPayload', 400);
+  }
+  const data = await joinSession(sessionId, req.user.id, anonymousPayload);
+  return success(res, data);
+});
+
+export const aggregateResult = asyncHandler(async (req, res) => {
+  const { sessionId } = req.query;
+  if (!sessionId) return fail(res, '缺少 sessionId', 400);
+  const data = await getAggregateResult(sessionId);
+  return success(res, data);
+});
+
 export default {
   // legacy
   getGalaxyFromNotes, getGalaxyFromKnowledgeBase, getMixedGalaxy,
@@ -494,5 +513,7 @@ export default {
   mergePersons, updatePersonIntimacy, listPersons,
   // relationship
   inviteRelationship, acceptRelationship, revokeRelationship,
-  listRelationshipInvitations, getRelationshipGraphHandler
+  listRelationshipInvitations, getRelationshipGraphHandler,
+  // aggregate
+  aggregateJoin, aggregateResult
 };

@@ -44,5 +44,10 @@ export const config = Object.freeze({
 
   // 心智星系 · 隐私控制
   localMode: process.env.LOCAL_MODE === 'true',
-  afterDelete: process.env.AFTER_DELETE === 'true'
+  afterDelete: process.env.AFTER_DELETE === 'true',
+
+  // D6 多人匿名聚合星系
+  aggregate: {
+    enabled: process.env.AGGREGATE_ENABLED === 'true'
+  }
 });
