@@ -210,6 +210,110 @@ export async function analyzeDeep(userId, { segments, basicResult = {}, options 
   }
 }
 
+const BELIEF_CHECK_PROMPT = `你是一位认知行为分析专家。请对以下信念进行 5 维度评估。
+
+输出格式（只返回 JSON）：
+
+{
+  "scores": {
+    "evidenceStrength": 0-1,
+    "logicalConsistency": 0-1,
+    "counterexampleTolerance": 0-1,
+    "emotionalLoad": 0-1,
+    "behavioralConsequence": 0-1
+  },
+  "alternatives": ["替代信念1", "替代信念2"],
+  "rawAnalysis": "简要分析（50字内）"
+}
+
+评分规则：
+- evidenceStrength: 信念有客观证据支持的程度（高=有充分证据）
+- logicalConsistency: 信念内部逻辑自洽程度（高=逻辑严密）
+- counterexampleTolerance: 信念容纳反例的程度（高=能接受不同视角）
+- emotionalLoad: 信念承载的情绪负荷（高=情绪强烈）
+- behavioralConsequence: 信念对行为的影响程度（高=显著影响行为）
+
+替代信念要求：至少 2 条，更平衡、更灵活的视角。`;
+
+export async function analyzeDeepBelief(userId, beliefText) {
+  if (!beliefText || typeof beliefText !== 'string') {
+    throw Object.assign(new Error('缺少信念文本'), { statusCode: 400 });
+  }
+
+  const truncated = beliefText.length > 200 ? beliefText.substring(0, 200) : beliefText;
+
+  try {
+    const response = await callAi({
+      userId,
+      model: 'deepseek-chat',
+      systemPrompt: BELIEF_CHECK_PROMPT,
+      userMessage: `信念：${truncated}`,
+      temperature: 0.3,
+      maxTokens: 1024,
+      stream: false
+    });
+
+    const text = typeof response === 'object' ? (response.text || '') : String(response);
+    const parsed = extractJson(text);
+
+    if (!parsed || !parsed.scores) {
+      return fallbackBeliefCheck(truncated);
+    }
+
+    const scores = {
+      evidenceStrength: clampScore(parsed.scores.evidenceStrength),
+      logicalConsistency: clampScore(parsed.scores.logicalConsistency),
+      counterexampleTolerance: clampScore(parsed.scores.counterexampleTolerance),
+      emotionalLoad: clampScore(parsed.scores.emotionalLoad),
+      behavioralConsequence: clampScore(parsed.scores.behavioralConsequence)
+    };
+
+    const avg = Object.values(scores).reduce((s, v) => s + v, 0) / 5;
+    let risk;
+    if (avg < 0.4) risk = 'high';
+    else if (avg > 0.7) risk = 'low';
+    else risk = 'medium';
+
+    return {
+      scores,
+      risk,
+      alternatives: (parsed.alternatives || []).slice(0, 3),
+      rawAnalysis: (parsed.rawAnalysis || '').substring(0, 100)
+    };
+  } catch {
+    return fallbackBeliefCheck(truncated);
+  }
+}
+
+function clampScore(v) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return 0.5;
+  return Math.max(0, Math.min(1, n));
+}
+
+function fallbackBeliefCheck(text) {
+  const negWords = ['我不', '永远', '绝不', '总是', '没人', '没有', '无法', '不能', '失败', '差劲'];
+  const negCount = negWords.filter(w => text.includes(w)).length;
+  const emoWords = ['恨', '怕', '气', '痛', '苦', '焦虑', '绝望', '恐惧', '愤怒', '悲伤'];
+  const emoCount = emoWords.filter(w => text.includes(w)).length;
+
+  const evidenceStrength = 0.5 - negCount * 0.05;
+  const emotionalLoad = 0.3 + emoCount * 0.1;
+
+  return {
+    scores: {
+      evidenceStrength: clampScore(evidenceStrength),
+      logicalConsistency: 0.5,
+      counterexampleTolerance: clampScore(0.5 - negCount * 0.03),
+      emotionalLoad: clampScore(emotionalLoad),
+      behavioralConsequence: clampScore(0.3 + negCount * 0.05)
+    },
+    risk: clampScore(evidenceStrength + 0.5) < 0.4 ? 'high' : 'medium',
+    alternatives: ['尝试从不同角度看待这个想法', '问问自己：如果朋友这么说，我会怎么回应？'],
+    rawAnalysis: '基于关键词规则的降级评估'
+  };
+}
+
 export function buildGalaxyContextPrompt(snapshot) {
   if (!snapshot || !snapshot.bodies) return '当前星系：空。';
   const bodies = snapshot.bodies;

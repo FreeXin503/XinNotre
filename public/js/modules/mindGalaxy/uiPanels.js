@@ -652,11 +652,17 @@ async function renderReportPanel(body) {
           </div>`;
         if (b.sourceRef?.length > 0) {
           const ref = b.sourceRef[0];
-          html += `<div style="margin-top:6px;display:flex;gap:6px;">
+          html += `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
             ${ref.galaxyUrl ? `<a href="${ref.galaxyUrl}" target="_top" style="font-size:0.65rem;color:#4fc3f7;text-decoration:none;padding:2px 8px;border:1px solid #4fc3f7;border-radius:10px;">定位到星系</a>` : ''}
             ${ref.excerpt ? `<button class="view-diary-btn" data-excerpt="${escapeHtml(ref.excerpt)}" style="font-size:0.65rem;color:#ccc;background:none;border:1px solid #555;border-radius:10px;padding:2px 8px;cursor:pointer;">查看日记</button>` : ''}
+            <button class="check-belief-btn" data-belief="${escapeHtml(b.label || '')}" style="font-size:0.65rem;color:#8f8;background:none;border:1px solid hsla(120,40%,40%,0.5);border-radius:10px;padding:2px 8px;cursor:pointer;">检验信念</button>
+          </div>`;
+        } else {
+          html += `<div style="margin-top:6px;">
+            <button class="check-belief-btn" data-belief="${escapeHtml(b.label || '')}" style="font-size:0.65rem;color:#8f8;background:none;border:1px solid hsla(120,40%,40%,0.5);border-radius:10px;padding:2px 8px;cursor:pointer;">检验信念</button>
           </div>`;
         }
+        html += '<div class="belief-check-result" style="display:none;"></div>';
         html += '</div>';
       });
     }
@@ -685,6 +691,56 @@ async function renderReportPanel(body) {
       btn.addEventListener('click', () => {
         const excerpt = btn.dataset.excerpt;
         showDiaryModal(excerpt);
+      });
+    });
+
+    body.querySelectorAll('.check-belief-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const belief = btn.dataset.belief;
+        if (!belief) return;
+        const resultDiv = btn.closest('div')?.parentElement?.querySelector('.belief-check-result');
+        if (resultDiv) resultDiv.style.display = 'block';
+        btn.disabled = true;
+        btn.textContent = '检验中...';
+        try {
+          const { ApiClient } = await import('../../api.js');
+          const client = new ApiClient();
+          const res = await client.request('/mind-galaxy/belief-check', {
+            method: 'POST',
+            body: JSON.stringify({ beliefText: belief }),
+            headers: client.getHeaders()
+          });
+          if (res?.success && res.data) {
+            const d = res.data;
+            const riskColor = d.risk === 'high' ? '#ef5350' : d.risk === 'medium' ? '#ff9800' : '#8f8';
+            const riskLabel = d.risk === 'high' ? '高风险' : d.risk === 'medium' ? '中等' : '低风险';
+            if (resultDiv) {
+              resultDiv.innerHTML = `
+                <div style="margin-top:6px;padding:8px;background:hsla(240,15%,10%,0.6);border-radius:6px;font-size:0.75rem;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                    <span style="color:#aaa;">风险等级</span>
+                    <span style="color:${riskColor};font-weight:600;">${riskLabel}</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
+                    <span style="color:#888;">证据强度</span><span style="color:#ddd;text-align:right;">${Math.round((d.scores?.evidenceStrength || 0) * 100)}%</span>
+                    <span style="color:#888;">逻辑自洽</span><span style="color:#ddd;text-align:right;">${Math.round((d.scores?.logicalConsistency || 0) * 100)}%</span>
+                    <span style="color:#888;">反例容纳</span><span style="color:#ddd;text-align:right;">${Math.round((d.scores?.counterexampleTolerance || 0) * 100)}%</span>
+                    <span style="color:#888;">情绪负荷</span><span style="color:#ddd;text-align:right;">${Math.round((d.scores?.emotionalLoad || 0) * 100)}%</span>
+                    <span style="color:#888;">行为影响</span><span style="color:#ddd;text-align:right;">${Math.round((d.scores?.behavioralConsequence || 0) * 100)}%</span>
+                  </div>
+                  ${d.alternatives?.length ? `<div style="color:#8f8;font-size:0.7rem;">替代视角：${d.alternatives.join('；')}</div>` : ''}
+                </div>`;
+              resultDiv.style.display = 'block';
+            }
+          }
+        } catch {
+          if (resultDiv) {
+            resultDiv.innerHTML = '<div style="color:#f88;font-size:0.75rem;">检验失败</div>';
+            resultDiv.style.display = 'block';
+          }
+        }
+        btn.disabled = false;
+        btn.textContent = '检验信念';
       });
     });
   } catch (e) {

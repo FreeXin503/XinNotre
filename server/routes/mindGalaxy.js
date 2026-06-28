@@ -14,6 +14,7 @@ import {
 } from '../controllers/mindGalaxyController.js';
 import { aiGuideStream } from '../controllers/mindGalaxyGuideController.js';
 import { startSocraticSession, socraticStepHandler } from '../controllers/socraticController.js';
+import { checkBeliefHandler, getBeliefHistoryHandler } from '../controllers/beliefCheckController.js';
 
 const router = Router();
 
@@ -79,5 +80,9 @@ router.post('/ai-guide', authMiddleware, aiGuideStream);
 // ── D8 苏格拉底反思引导 ──
 router.post('/socratic/start', authMiddleware, startSocraticSession);
 router.post('/socratic/step', authMiddleware, socraticStepHandler);
+
+// ── D9 信念检验 ──
+router.post('/belief-check', authMiddleware, checkBeliefHandler);
+router.get('/belief-check/history', authMiddleware, getBeliefHistoryHandler);
 
 export default router;
