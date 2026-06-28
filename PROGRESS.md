@@ -149,7 +149,7 @@
 | D6 · multiplayer_group | ✅ | aggregateService.js / aggregator.js / migrations_v11.sql / controller/routes |
 | D7 · ai_galaxy_guide | ✅ | galaxyGuideService.js / mindGalaxyGuideController.js / nlpDeepService.js / index.js / routes |
 | D8 · ai_socratic | ✅ | socraticService.js / socratic.js / socraticController.js / migrations_v12.sql / routes / HTML |
-| D9 · ai_belief_check | ⬜ | |
+| D9 · ai_belief_check | ✅ | beliefCheckService.js / nlpDeepService.js / beliefCheckController.js / migrations_v13.sql / uiPanels.js |
 | D10 · digital_twin_evolve | ⬜ | |
 
 ### 2026-06-28：D1 DayOne JSON 导入完成
@@ -239,3 +239,15 @@
   - AI 不可用降级为 fallbackUtterance 模板
   - 前端 socratic.js 管理会话生命周期：topic 输入 → 消息列表 → 阶段指示器
 - **下一步**：D9 信念系统 5 维度检验
+
+### 2026-06-28：D9 信念系统 5 维度检验完成
+
+- **改动文件**：beliefCheckService.js, nlpDeepService.js, beliefCheckController.js, mindGalaxy.js, uiPanels.js, migrations_v13.sql, database.js
+- **关键决策**：
+  - 5 维度评分：evidenceStrength / logicalConsistency / counterexampleTolerance / emotionalLoad / behavioralConsequence
+  - risk 判定：avg < 0.4 → high, avg > 0.7 → low, else medium
+  - analyzeDeepBelief 独立于 analyzeDeep，轻量 prompt + temperature 0.3
+  - LLM 失败降级：基于关键词规则的 fallback（否定词/情绪词扫描）
+  - 至少 2 条替代信念建议
+  - 前端报告面板每项信念旁「检验信念」按钮，点击展开 5 维分数 + 替代视角
+- **下一步**：D10 数字心智持续演化 + cron
