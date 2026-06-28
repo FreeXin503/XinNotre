@@ -1,37 +1,69 @@
 import { asyncHandler, success, fail } from '../utils/response.js';
 import { parseDayOneJson } from '../services/import/dayoneImport.js';
+import { NotionImporter } from '../services/import/notionImport.js';
+import { ObsidianImporter } from '../services/import/obsidianImport.js';
+import { EvernoteImporter } from '../services/import/evernoteImport.js';
+import { FeishuImporter } from '../services/import/feishuImport.js';
 import { preprocess } from '../services/mindGalaxy/preprocessService.js';
 import noteRepository from '../repositories/noteRepository.js';
 
-export const importDayOne = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    return fail(res, '请上传 DayOne JSON 文件', 400);
+async function importEntries(userId, entries) {
+  let imported = 0;
+  let dedupSkipped = 0;
+
+  for (const entry of entries) {
+    const existing = await noteRepository.findById(entry.id, userId);
+    if (existing) {
+      dedupSkipped++;
+      continue;
+    }
+
+    await noteRepository.create({
+      id: entry.id,
+      title: entry.title,
+      content: entry.content,
+      category: entry.category,
+      meta_json: entry.meta_json || {}
+    }, userId);
+
+    preprocess(userId, {
+      sources: [{
+        type: 'notes',
+        text: entry.content,
+        ref: entry.id,
+        timestamp: new Date().toISOString()
+      }]
+    }).catch(() => {});
+
+    imported++;
   }
 
-  if (req.file.size > 10 * 1024 * 1024) {
-    return fail(res, '文件大小超过限制（最大 10MB）', 413);
-  }
+  return { imported, dedupSkipped };
+}
+
+export const importDayOne = asyncHandler(async (req, res) => {
+  if (!req.file) return fail(res, '请上传 DayOne JSON 文件', 400);
+  if (req.file.size > 10 * 1024 * 1024) return fail(res, '文件大小超过限制（最大 10MB）', 413);
 
   const userId = req.user.id;
   const { entries, skipped: parseSkipped } = await parseDayOneJson(req.file.buffer);
 
-  if (entries.length === 0) {
-    return success(res, { imported: 0, skipped: parseSkipped });
-  }
+  if (entries.length === 0) return success(res, { imported: 0, skipped: parseSkipped });
 
   let imported = 0;
   let dedupSkipped = 0;
 
   for (const entry of entries) {
     let content = entry.content;
-
     let truncated = false;
     if (content.length > 50000) {
       content = content.substring(0, 50000);
       truncated = true;
     }
 
-    const existing = await noteRepository.findByUuid(entry.uuid, userId);
+    const noteId = `do_${entry.uuid.slice(0, 28)}`;
+
+    const existing = await noteRepository.findById(noteId, userId);
     if (existing) {
       dedupSkipped++;
       continue;
@@ -45,11 +77,7 @@ export const importDayOne = asyncHandler(async (req, res) => {
         sampledAt: entry.sampledAt
       }
     };
-    if (truncated) {
-      metaJson.dayone.truncated = true;
-    }
-
-    const noteId = `do_${entry.uuid.slice(0, 28)}`;
+    if (truncated) metaJson.dayone.truncated = true;
 
     await noteRepository.create({
       id: noteId,
@@ -60,16 +88,41 @@ export const importDayOne = asyncHandler(async (req, res) => {
     }, userId);
 
     preprocess(userId, {
-      sources: [{
-        type: 'notes',
-        text: content,
-        ref: noteId,
-        timestamp: entry.sampledAt
-      }]
+      sources: [{ type: 'notes', text: content, ref: noteId, timestamp: entry.sampledAt }]
     }).catch(() => {});
 
     imported++;
   }
 
   return success(res, { imported, skipped: parseSkipped + dedupSkipped });
+});
+
+async function handleImporterUpload(req, res, ImporterClass, label) {
+  if (!req.file) return fail(res, `请上传${label}文件`, 400);
+  if (req.file.size > 10 * 1024 * 1024) return fail(res, '文件大小超过限制（最大 10MB）', 413);
+
+  const userId = req.user.id;
+  const importer = new ImporterClass();
+  const { entries, skipped: parseSkipped } = await importer.parse(req.file.buffer);
+
+  if (entries.length === 0) return success(res, { imported: 0, skipped: parseSkipped });
+
+  const { imported, dedupSkipped } = await importEntries(userId, entries);
+  return success(res, { imported, skipped: parseSkipped + dedupSkipped });
+}
+
+export const importNotion = asyncHandler(async (req, res) => {
+  return handleImporterUpload(req, res, NotionImporter, 'Notion');
+});
+
+export const importObsidian = asyncHandler(async (req, res) => {
+  return handleImporterUpload(req, res, ObsidianImporter, 'Obsidian');
+});
+
+export const importEvernote = asyncHandler(async (req, res) => {
+  return handleImporterUpload(req, res, EvernoteImporter, '印象笔记');
+});
+
+export const importFeishu = asyncHandler(async (req, res) => {
+  return handleImporterUpload(req, res, FeishuImporter, '飞书');
 });
