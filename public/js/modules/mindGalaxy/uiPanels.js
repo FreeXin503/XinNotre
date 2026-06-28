@@ -469,7 +469,7 @@ async function renderPersonPanel(body) {
   } else {
     list.innerHTML = persons.map(p => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a1a2e;">
-        <span style="font-size:13px;">${p.name || p.id}</span>
+        <span style="font-size:13px;">${escapeHtml(p.name || p.id)}</span>
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:12px;color:#888;">亲密度:</span>
           <input type="range" min="0" max="100" value="${Math.round((p.intimacy || 0) * 100)}" data-pid="${p.id || p.nodeId}" class="intimacy-slider" style="width:80px;">
@@ -647,7 +647,7 @@ async function renderReportPanel(body) {
       beliefs.forEach(b => {
         html += `<div style="padding:8px 12px;background:#1a1a2e;border-radius:6px;margin-bottom:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:0.85rem;color:#e0e0e0;">${b.label || '-'}</span>
+            <span style="font-size:0.85rem;color:#e0e0e0;">${escapeHtml(b.label || '-')}</span>
             <span style="font-size:0.7rem;color:${b.polarity === 'pos' ? '#4fc3f7' : '#ef5350'};">${b.polarity === 'pos' ? '⊕' : '⊖'} ${Math.round((b.strength || 0) * 100)}%</span>
           </div>`;
         if (b.sourceRef?.length > 0) {
@@ -667,7 +667,7 @@ async function renderReportPanel(body) {
       persons.forEach(p => {
         html += `<div style="padding:8px 12px;background:#1a1a2e;border-radius:6px;margin-bottom:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:0.85rem;color:#e0e0e0;">${p.polarity > 0 ? '⊕' : '⊖'} ${p.name || '-'}</span>
+            <span style="font-size:0.85rem;color:#e0e0e0;">${p.polarity > 0 ? '⊕' : '⊖'} ${escapeHtml(p.name || '-')}</span>
             <span style="font-size:0.7rem;color:#888;">亲密度 ${Math.round((p.intimacy || 0) * 100)}%</span>
           </div>`;
         if (p.sourceRef?.galaxyUrl) {

@@ -341,6 +341,8 @@ function initThreeScene(container) {
     }
   };
 
+  function esc(str) { if (str == null) return ''; const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
+
   function openDetailPanel(data) {
     if (!_detailPanelEl) return;
     _detailPanelEl.style.width = '280px';
@@ -350,11 +352,11 @@ function initThreeScene(container) {
     const typeNames = { sun: '认知核心', planet: '信念行星', satellite: '思维卫星' };
     content.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <h3 style="margin:0;font-size:1.05rem;color:#4fc3f7;">${data.label || '未命名'}</h3>
+        <h3 style="margin:0;font-size:1.05rem;color:#4fc3f7;">${esc(data.label || '未命名')}</h3>
         <button id="cosmos-detail-close" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2rem;">&times;</button>
       </div>
-      <div style="font-size:0.8rem;color:#aaa;margin-bottom:12px;">${typeNames[data.type] || data.type || '未知类型'}</div>
-      ${data.meta ? Object.entries(data.meta).map(([k, v]) => `<div style="margin-bottom:6px;"><span style="color:#888;font-size:0.75rem;">${k}:</span> <span style="font-size:0.8rem;">${typeof v === 'object' ? JSON.stringify(v).substring(0, 80) : v}</span></div>`).join('') : ''}
+      <div style="font-size:0.8rem;color:#aaa;margin-bottom:12px;">${esc(typeNames[data.type] || data.type || '未知类型')}</div>
+      ${data.meta ? Object.entries(data.meta).map(([k, v]) => `<div style="margin-bottom:6px;"><span style="color:#888;font-size:0.75rem;">${esc(k)}:</span> <span style="font-size:0.8rem;">${esc(typeof v === 'object' ? JSON.stringify(v).substring(0, 80) : v)}</span></div>`).join('') : ''}
     `;
     document.getElementById('cosmos-detail-close')?.addEventListener('click', (e) => {
       e.stopPropagation();

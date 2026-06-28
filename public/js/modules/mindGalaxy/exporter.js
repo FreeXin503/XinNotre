@@ -259,7 +259,6 @@ export function exportOBJ(scene) {
 // ── C10: 视频导出 ──
 
 let _videoRecorder = null;
-let _videoChunks = [];
 
 export function exportVideo(renderer, durationSec = 15, fps = 30) {
   if (!renderer) return;
@@ -275,7 +274,7 @@ export function exportVideo(renderer, durationSec = 15, fps = 30) {
     return;
   }
 
-  _videoChunks = [];
+  const chunks = [];
   const stream = canvas.captureStream(fps);
   const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
     ? 'video/webm;codecs=vp9'
@@ -287,9 +286,9 @@ export function exportVideo(renderer, durationSec = 15, fps = 30) {
     _videoRecorder = new MediaRecorder(stream);
   }
 
-  _videoRecorder.ondataavailable = (e) => { if (e.data.size > 0) _videoChunks.push(e.data); };
+  _videoRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
   _videoRecorder.onstop = () => {
-    const blob = new Blob(_videoChunks, { type: 'video/webm' });
+    const blob = new Blob(chunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.download = `mind-galaxy-${Date.now()}.webm`;

@@ -13,6 +13,14 @@ let labelObjects = [];
 let labelsVisible = true;
 let _scene = null;
 let _camera = null;
+let _searchListeners = [];
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(str);
+  return d.innerHTML;
+}
 
 export function initInteraction(rs) {
   raycaster = rs.raycaster;
@@ -34,6 +42,8 @@ export function disposeInteraction() {
   window.removeEventListener('click', onClick);
   window.removeEventListener('dblclick', onDoubleClick);
   window.removeEventListener('keydown', onKeyDown);
+  _searchListeners.forEach(({ el, type, fn }) => el.removeEventListener(type, fn));
+  _searchListeners = [];
   hoveredObj = selectedObj = null;
 }
 
@@ -102,8 +112,18 @@ function onClick(event) {
 }
 
 function onDoubleClick(event) {
-  if (!selectedObj || selectedObj.userData?.type === 'black_hole') return;
-  const pos = selectedObj.getWorldPosition(new (window.THREE)().Vector3());
+  if (!camera || !scene) return;
+  const rect = event.target.getBoundingClientRect();
+  const mx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  const v = new window.THREE.Vector3(mx, my, 0.5);
+  const ray = new window.THREE.Raycaster();
+  ray.setFromCamera(v, camera);
+  const hits = ray.intersectObjects(scene.children, true);
+  if (!hits.length || hits[0].object.userData?.type === 'black_hole') return;
+  selectedObj = hits[0].object;
+  const pos = new window.THREE.Vector3();
+  selectedObj.getWorldPosition(pos);
   const dist = selectedObj.userData?.type === 'giant_star' ? 8 : selectedObj.userData?.type === 'nebula' ? 15 : 5;
   focusOnBody(pos, dist);
 }
@@ -124,7 +144,7 @@ export function focusOnBody(targetPos, distance = 5) {
   if (!camera || !controls) return;
   cameraTween = {
     start: camera.position.clone(),
-    end: new (window.THREE)().Vector3(targetPos.x + distance, targetPos.y + distance * 0.5, targetPos.z + distance),
+    end: new window.THREE.Vector3(targetPos.x + distance, targetPos.y + distance * 0.5, targetPos.z + distance),
     targetStart: controls.target.clone(),
     targetEnd: targetPos.clone(),
     progress: 0,
@@ -204,20 +224,20 @@ function updateDetailPanel(data) {
     const bodyId = data.nodeId || data.id || '';
     content.innerHTML = `
       <div class="detail-header">
-        <h3>${data.name}</h3>
-        <span class="detail-type-tag">${data.type || '未知'}</span>
+        <h3>${escapeHtml(data.name)}</h3>
+        <span class="detail-type-tag">${escapeHtml(data.type || '未知')}</span>
       </div>
       <div class="detail-info">
-        ${data.coreBelief ? `<p><strong>核心信念：</strong>${data.coreBelief}</p>` : ''}
-        ${meta.coreSelf ? `<p>自我强度: ${meta.coreSelf.strength || '-'} | 稳定性: ${meta.coreSelf.stability || '-'}</p>` : ''}
-        ${meta.belief ? `<p>信念层级: ${meta.belief.level || '-'} | 极性: ${meta.belief.polarity === 'pos' ? '积极' : '消极'}</p>` : ''}
-        ${meta.theme ? `<p>重要度: ${meta.theme.importance || '-'} | 趋势: ${meta.theme.trend || '-'}</p>` : ''}
-        ${meta.emotion ? `<p>情绪强度: ${meta.emotion.intensity || '-'}</p>` : ''}
+        ${data.coreBelief ? `<p><strong>核心信念：</strong>${escapeHtml(data.coreBelief)}</p>` : ''}
+        ${meta.coreSelf ? `<p>自我强度: ${escapeHtml(meta.coreSelf.strength)} | 稳定性: ${escapeHtml(meta.coreSelf.stability)}</p>` : ''}
+        ${meta.belief ? `<p>信念层级: ${escapeHtml(meta.belief.level)} | 极性: ${meta.belief.polarity === 'pos' ? '积极' : '消极'}</p>` : ''}
+        ${meta.theme ? `<p>重要度: ${escapeHtml(meta.theme.importance)} | 趋势: ${escapeHtml(meta.theme.trend)}</p>` : ''}
+        ${meta.emotion ? `<p>情绪强度: ${escapeHtml(meta.emotion.intensity)}</p>` : ''}
       </div>
       <div class="detail-actions">
-        <button class="detail-action-btn" data-action="rename" data-id="${bodyId}">重命名</button>
-        <button class="detail-action-btn" data-action="hide" data-id="${bodyId}">隐藏</button>
-        ${data.type === 'planet_system' ? `<button class="detail-action-btn" data-action="classify" data-id="${bodyId}">归类</button>` : ''}
+        <button class="detail-action-btn" data-action="rename" data-id="${escapeHtml(bodyId)}">重命名</button>
+        <button class="detail-action-btn" data-action="hide" data-id="${escapeHtml(bodyId)}">隐藏</button>
+        ${data.type === 'planet_system' ? `<button class="detail-action-btn" data-action="classify" data-id="${escapeHtml(bodyId)}">归类</button>` : ''}
       </div>
     `;
     bindDetailActions(bodyId);
@@ -258,10 +278,8 @@ function hideCelestialBody(bodyId) {
   const hidden = JSON.parse(localStorage.getItem('mg_hidden') || '[]');
   if (!hidden.includes(bodyId)) hidden.push(bodyId);
   localStorage.setItem('mg_hidden', JSON.stringify(hidden));
-  document.getElementById('canvas-container').querySelectorAll('[data-body-id="' + bodyId + '"]').forEach(el => {
-    const obj = scene.getObjectByProperty('userData.nodeId', bodyId) || scene.getObjectByProperty('userData.id', bodyId);
-    if (obj) obj.visible = false;
-  });
+  const obj = scene.getObjectByProperty('userData.nodeId', bodyId) || scene.getObjectByProperty('userData.id', bodyId);
+  if (obj) obj.visible = false;
   updateDetailPanel(null);
 }
 
@@ -319,9 +337,10 @@ export function initSearch() {
   const searchInput = document.getElementById('search-input');
   const typeFilter = document.getElementById('search-type-filter');
   const clearBtn = document.getElementById('btn-clear-search');
+  const push = (el, type, fn) => { el.addEventListener(type, fn); _searchListeners.push({ el, type, fn }); };
 
   if (searchInput) {
-    searchInput.addEventListener('input', () => {
+    push(searchInput, 'input', () => {
       const keyword = searchInput.value.trim();
       if (keyword) {
         if (typeFilter) typeFilter.value = '';
@@ -334,7 +353,7 @@ export function initSearch() {
   }
 
   if (typeFilter) {
-    typeFilter.addEventListener('change', () => {
+    push(typeFilter, 'change', () => {
       const type = typeFilter.value;
       if (type) {
         if (searchInput) searchInput.value = '';
@@ -347,7 +366,7 @@ export function initSearch() {
   }
 
   if (clearBtn) {
-    clearBtn.addEventListener('click', clearSearch);
+    push(clearBtn, 'click', clearSearch);
   }
 }
 
