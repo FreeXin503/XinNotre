@@ -5,7 +5,7 @@ import { initRenderer, initPostProcessing, disposePostProcessing, disposeScene, 
 import { createBlackHole, createGiantStar, createMainSequence, createPlanetSystem, createNebula } from './celestialBodies.js';
 import { createBinaryCompanion, createAsteroidBelt, createDarkMatter, createSupernovaRemnant, createNeutronStar } from './celestialBodies2.js';
 import { spiralPosition } from './layout.js';
-import { initInteraction, updateInteraction, disposeInteraction, initLabels, renderLabels, disposeLabels, setLabelsVisible } from './interaction.js';
+import { initInteraction, updateInteraction, disposeInteraction, initLabels, renderLabels, disposeLabels, setLabelsVisible, focusOnBody } from './interaction.js';
 import { initUI, advanceTime, getNormalizedTime } from './uiPanels.js';
 import { initExporter } from './exporter.js';
 
@@ -508,4 +508,165 @@ export function unmountMindGalaxy() {
   disposeSkybox(scene);
   disposeScene(scene, renderer, controls);
   scene = camera = renderer = controls = clock = rs = null;
+}
+
+let _guideAbortController = null;
+
+function findBodyIdByName(name) {
+  for (const item of celestialItems) {
+    if (item?.body?.name === name || item?.body?.label === name) {
+      return item.body.id || item.body.nodeId;
+    }
+  }
+  return null;
+}
+
+function getBodyWorldPosition(bodyId) {
+  for (const item of celestialItems) {
+    const id = item?.body?.id || item?.body?.nodeId;
+    if (id === bodyId) {
+      const pos = new window.THREE.Vector3();
+      item.group.getWorldPosition(pos);
+      return pos;
+    }
+  }
+  return null;
+}
+
+export async function startGalaxyGuide(question) {
+  const outputEl = document.getElementById('guide-output');
+  if (!outputEl) return;
+
+  if (_guideAbortController) {
+    _guideAbortController.abort();
+  }
+  _guideAbortController = new AbortController();
+  const signal = _guideAbortController.signal;
+
+  outputEl.innerHTML = '<div class="guide-thinking">思考中...</div>';
+
+  try {
+    const { ApiClient } = await import('../../api.js');
+    const client = new ApiClient();
+    const token = client.getToken();
+
+    const response = await fetch('/api/mind-galaxy/ai-guide', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ question }),
+      signal
+    });
+
+    if (!response.ok) {
+      outputEl.innerHTML = '<div class="guide-error">AI 向导服务不可用</div>';
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let fullText = '';
+    let reading = true;
+    let currentEvent = '';
+
+    while (reading) {
+      const { done, value } = await reader.read();
+      if (done) { reading = false; break; }
+      buf += decoder.decode(value, { stream: true });
+
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (trimmed.startsWith('event: ')) {
+          currentEvent = trimmed.substring(7).trim();
+          if (currentEvent === 'done') {
+            reading = false;
+            break;
+          }
+          continue;
+        }
+
+        if (trimmed.startsWith('data: ')) {
+          const dataStr = trimmed.substring(6);
+          let data;
+          try { data = JSON.parse(dataStr); } catch { continue; }
+
+          if (data.error) {
+            outputEl.innerHTML = `<div class="guide-error">${data.error}</div>`;
+            reading = false;
+            break;
+          }
+
+          if (data.text) {
+            fullText += data.text;
+            outputEl.innerHTML = `<div class="guide-response">${fullText}</div>`;
+          }
+
+          if (data.bodyId !== undefined && data.action) {
+            handleGuideAction(data);
+          }
+        }
+      }
+    }
+
+    if (fullText) {
+      outputEl.innerHTML = `<div class="guide-response">${fullText}</div>`;
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    outputEl.innerHTML = '<div class="guide-error">连接中断</div>';
+  }
+}
+
+export function abortGalaxyGuide() {
+  if (_guideAbortController) {
+    _guideAbortController.abort();
+    _guideAbortController = null;
+  }
+}
+
+function handleGuideAction(action) {
+  if (!action.bodyId) return;
+
+  const T = window.THREE;
+  if (action.action === 'focus') {
+    const pos = getBodyWorldPosition(action.bodyId);
+    if (pos) {
+      focusOnBody(pos, 5);
+    } else {
+      const name = action.bodyId;
+      const foundId = findBodyIdByName(name);
+      if (foundId) {
+        const foundPos = getBodyWorldPosition(foundId);
+        if (foundPos) focusOnBody(foundPos, 5);
+      }
+    }
+  }
+
+  if (action.action === 'highlight') {
+    scene.traverse(obj => {
+      if (obj.userData?.nodeId === action.bodyId || obj.userData?.id === action.bodyId) {
+        if (obj.material) {
+          obj.material.emissiveIntensity = Math.min(5, (obj.material.emissiveIntensity || 1) * 3);
+          setTimeout(() => {
+            if (obj.material) obj.material.emissiveIntensity = Math.max(0.5, (obj.material.emissiveIntensity || 1) / 3);
+          }, 2000);
+        }
+      }
+    });
+  }
+
+  if (action.action === 'timeline' && action.params?.targetTime) {
+    const markers = document.querySelectorAll('.evo-marker');
+    if (markers.length > 0) {
+      markers[0].scrollIntoView({ behavior: 'smooth' });
+    }
+  }
 }

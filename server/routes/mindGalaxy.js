@@ -12,6 +12,7 @@ import {
   listRelationshipInvitations, getRelationshipGraphHandler,
   aggregateJoin, aggregateResult
 } from '../controllers/mindGalaxyController.js';
+import { aiGuideStream } from '../controllers/mindGalaxyGuideController.js';
 
 const router = Router();
 
@@ -70,5 +71,8 @@ router.get('/relationship/graph/:token', getRelationshipGraphHandler);
 // ── D6 多人匿名聚合 ──
 router.post('/aggregate/join', authMiddleware, aggregateJoin);
 router.get('/aggregate/result', authMiddleware, aggregateResult);
+
+// ── D7 星系向导 ──
+router.post('/ai-guide', authMiddleware, aiGuideStream);
 
 export default router;

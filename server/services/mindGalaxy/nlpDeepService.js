@@ -1,6 +1,8 @@
 /**
  * 心智星系 v2 · NLP 深度分析服务
  * 职责：LLM 提取核心信念 / 认知模式 / 关系动力 / 成长节点 / 创伤
+ *
+ * D7: 导出 buildGalaxyContextPrompt 供 galaxyGuideService 使用
  */
 import { callAi, extractJson } from '../aiProviderService.js';
 
@@ -206,4 +208,32 @@ export async function analyzeDeep(userId, { segments, basicResult = {}, options 
       throw new Error(`AI_UNAVAILABLE: ${e.message || '分析服务不可用'}`);
     }
   }
+}
+
+export function buildGalaxyContextPrompt(snapshot) {
+  if (!snapshot || !snapshot.bodies) return '当前星系：空。';
+  const bodies = snapshot.bodies;
+  const galaxyType = snapshot.galaxyType || 'S';
+  const armCount = snapshot.spiralArms || 3;
+
+  const coreBeliefs = bodies
+    .filter(b => b.type === 'giant_star' && b.meta?.belief?.level === 'core')
+    .slice(0, 5)
+    .map(b => b.name)
+    .filter(Boolean);
+
+  const topPersons = bodies
+    .filter(b => b.type === 'binary_companion' || b.type === 'person')
+    .sort((a, b) => (b.meta?.person?.intimacy || 0) - (a.meta?.person?.intimacy || 0))
+    .slice(0, 5)
+    .map(b => b.name)
+    .filter(Boolean);
+
+  const parts = [];
+  parts.push(`星系类型：${galaxyType}${armCount}旋臂`);
+  if (coreBeliefs.length) parts.push(`核心信念(${coreBeliefs.length})：${coreBeliefs.join('、')}`);
+  if (topPersons.length) parts.push(`人物(${topPersons.length})：${topPersons.join('、')}`);
+  parts.push(`星体总数：${bodies.length}`);
+
+  return parts.join(' | ').substring(0, 200);
 }
