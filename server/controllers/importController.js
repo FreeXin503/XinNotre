@@ -4,6 +4,7 @@ import { NotionImporter } from '../services/import/notionImport.js';
 import { ObsidianImporter } from '../services/import/obsidianImport.js';
 import { EvernoteImporter } from '../services/import/evernoteImport.js';
 import { FeishuImporter } from '../services/import/feishuImport.js';
+import { ChatlogImporter } from '../services/import/chatlogImport.js';
 import { preprocess } from '../services/mindGalaxy/preprocessService.js';
 import noteRepository from '../repositories/noteRepository.js';
 
@@ -125,4 +126,8 @@ export const importEvernote = asyncHandler(async (req, res) => {
 
 export const importFeishu = asyncHandler(async (req, res) => {
   return handleImporterUpload(req, res, FeishuImporter, '飞书');
+});
+
+export const importChatlog = asyncHandler(async (req, res) => {
+  return handleImporterUpload(req, res, ChatlogImporter, '微信聊天记录');
 });
