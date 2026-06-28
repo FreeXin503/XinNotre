@@ -102,6 +102,8 @@ export function initUI() {
       analyzerTimeout = setTimeout(() => updateAnalyzerPreview(diaryInput.value), 300);
     });
   }
+
+  initSettings();
 }
 
 // ── 时间控制 ─────────────────────────────────────────────
@@ -295,3 +297,256 @@ export function importSnapshotData() {
     input.click();
   });
 }
+
+// ── 设置面板 ───────────────────────────────────────────────
+
+function initSettings() {
+  const settingsBtn = document.getElementById('btn-settings');
+  if (!settingsBtn) return;
+
+  settingsBtn.addEventListener('click', () => {
+    const overlay = document.createElement('div');
+    overlay.id = 'settings-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#0f0f1e;border:1px solid #2a2a4a;border-radius:12px;width:560px;max-height:80vh;overflow-y:auto;color:#e0e0e0;">
+        <div style="display:flex;border-bottom:1px solid #2a2a4a;">
+          <button class="settings-tab active" data-panel="privacy">隐私控制</button>
+          <button class="settings-tab" data-panel="hidden">隐藏列表</button>
+          <button class="settings-tab" data-panel="person">人物管理</button>
+          <button class="settings-tab" data-panel="mapping">映射规则</button>
+        </div>
+        <div id="settings-body" style="padding:20px;"></div>
+        <div style="padding:0 20px 20px;text-align:right;">
+          <button id="settings-close" style="padding:6px 20px;background:#333;border:none;color:#ccc;border-radius:6px;cursor:pointer;">关闭</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#settings-close').addEventListener('click', () => document.body.removeChild(overlay));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
+
+    const tabs = overlay.querySelectorAll('.settings-tab');
+    tabs.forEach(t => {
+      t.style.cssText = 'padding:10px 16px;background:none;border:none;color:#888;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;transition:all 0.2s;';
+      t.addEventListener('click', () => {
+        tabs.forEach(tt => { tt.classList.remove('active'); tt.style.color = '#888'; tt.style.borderBottomColor = 'transparent'; });
+        t.classList.add('active');
+        t.style.color = '#4fc3f7';
+        t.style.borderBottomColor = '#4fc3f7';
+        switchPanel(t.dataset.panel);
+      });
+    });
+    switchPanel('privacy');
+  });
+}
+
+function switchPanel(name) {
+  const body = document.getElementById('settings-body');
+  if (!body) return;
+  switch (name) {
+    case 'privacy': renderPrivacyPanel(body); break;
+    case 'hidden': renderHiddenPanel(body); break;
+    case 'person': renderPersonPanel(body); break;
+    case 'mapping': renderMappingPanel(body); break;
+  }
+}
+
+// ── C29 + C30: 隐私面板 ──
+function renderPrivacyPanel(body) {
+  const localMode = JSON.parse(localStorage.getItem('mg_localMode') || 'false');
+  const afterDelete = JSON.parse(localStorage.getItem('mg_afterDelete') || 'false');
+  body.innerHTML = `
+    <h4 style="margin:0 0 16px;color:#4fc3f7;">隐私控制</h4>
+    <div style="margin-bottom:16px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="toggle-local-mode" ${localMode ? 'checked' : ''} style="width:18px;height:18px;">
+        <div><strong>本地分析模式</strong><br><small style="color:#888;">开启后，LLM 调用将被禁用，数据不会上传</small></div>
+      </label>
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="toggle-after-delete" ${afterDelete ? 'checked' : ''} style="width:18px;height:18px;">
+        <div><strong>分析后删除原始文本</strong><br><small style="color:#888;">开启后，每次分析完成自动删除原始数据，仅保留分析结果</small></div>
+      </label>
+    </div>
+  `;
+  body.querySelector('#toggle-local-mode').addEventListener('change', (e) => {
+    localStorage.setItem('mg_localMode', JSON.stringify(e.target.checked));
+  });
+  body.querySelector('#toggle-after-delete').addEventListener('change', (e) => {
+    localStorage.setItem('mg_afterDelete', JSON.stringify(e.target.checked));
+  });
+}
+
+// ── C33: 隐藏列表面板 ──
+function renderHiddenPanel(body) {
+  const hidden = JSON.parse(localStorage.getItem('mg_hidden') || '[]');
+  body.innerHTML = `<h4 style="margin:0 0 16px;color:#4fc3f7;">隐藏的星体 (${hidden.length})</h4>`;
+  if (hidden.length === 0) {
+    body.innerHTML += '<p style="color:#888;">暂无隐藏星体</p>';
+    return;
+  }
+  body.innerHTML += hidden.map(id => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a1a2e;">
+      <span style="font-size:13px;color:#ccc;">${id}</span>
+      <button class="restore-btn" data-id="${id}" style="padding:4px 12px;background:#2e7d32;border:none;color:#fff;border-radius:4px;cursor:pointer;">恢复</button>
+    </div>
+  `).join('');
+  body.querySelectorAll('.restore-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const h = JSON.parse(localStorage.getItem('mg_hidden') || '[]');
+      const idx = h.indexOf(id);
+      if (idx >= 0) h.splice(idx, 1);
+      localStorage.setItem('mg_hidden', JSON.stringify(h));
+      body.closest('#settings-body') && renderHiddenPanel(body);
+    });
+  });
+}
+
+// ── C34: 人物管理面板 ──
+async function renderPersonPanel(body) {
+  body.innerHTML = `
+    <h4 style="margin:0 0 16px;color:#4fc3f7;">人物管理</h4>
+    <div id="person-list" style="margin-bottom:12px;"><p style="color:#888;">加载中...</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">
+      <div style="flex:1;min-width:160px;">
+        <label style="font-size:12px;color:#888;">人物 A</label>
+        <select id="merge-person-a" style="width:100%;padding:6px;background:#1a1a2e;border:1px solid #333;color:#ccc;border-radius:4px;margin-top:4px;"><option value="">选择...</option></select>
+      </div>
+      <div style="flex:1;min-width:160px;">
+        <label style="font-size:12px;color:#888;">人物 B</label>
+        <select id="merge-person-b" style="width:100%;padding:6px;background:#1a1a2e;border:1px solid #333;color:#ccc;border-radius:4px;margin-top:4px;"><option value="">选择...</option></select>
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button id="btn-merge-persons" style="padding:6px 16px;background:#e65100;border:none;color:#fff;border-radius:4px;cursor:pointer;">合并 (A←B)</button>
+      </div>
+    </div>
+  `;
+
+  let persons = [];
+  try {
+    const { ApiClient } = await import('../../api.js');
+    const client = new ApiClient();
+    const res = await client.request('/mind-galaxy/person/list', { headers: client.getHeaders() });
+    if (res?.success) persons = res.data.persons || [];
+  } catch {}
+
+  const list = body.querySelector('#person-list');
+  if (persons.length === 0) {
+    list.innerHTML = '<p style="color:#888;">暂无人物实体</p>';
+  } else {
+    list.innerHTML = persons.map(p => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a1a2e;">
+        <span style="font-size:13px;">${p.name || p.id}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:#888;">亲密度:</span>
+          <input type="range" min="0" max="100" value="${Math.round((p.intimacy || 0) * 100)}" data-pid="${p.id || p.nodeId}" class="intimacy-slider" style="width:80px;">
+          <span class="intimacy-val" style="font-size:12px;width:36px;">${Math.round((p.intimacy || 0) * 100)}%</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const selectA = body.querySelector('#merge-person-a');
+  const selectB = body.querySelector('#merge-person-b');
+  persons.forEach(p => {
+    const opt = `<option value="${p.id || p.nodeId}">${p.name || p.id}</option>`;
+    selectA.innerHTML += opt;
+    selectB.innerHTML += opt;
+  });
+
+  body.querySelector('#btn-merge-persons').addEventListener('click', async () => {
+    const personIdA = selectA.value;
+    const personIdB = selectB.value;
+    if (!personIdA || !personIdB || personIdA === personIdB) {
+      alert('请选择两个不同的人物'); return;
+    }
+    try {
+      const { ApiClient } = await import('../../api.js');
+      const client = new ApiClient();
+      const res = await client.request('/mind-galaxy/person/merge', {
+        method: 'POST', body: JSON.stringify({ personIdA, personIdB }), headers: client.getHeaders()
+      });
+      if (res?.success) { renderPersonPanel(body); }
+    } catch (e) { alert('合并失败: ' + e.message); }
+  });
+
+  body.querySelectorAll('.intimacy-slider').forEach(s => {
+    s.addEventListener('change', async (e) => {
+      const personId = e.target.dataset.pid;
+      const intimacy = parseInt(e.target.value) / 100;
+      const valEl = e.target.parentElement.querySelector('.intimacy-val');
+      if (valEl) valEl.textContent = Math.round(intimacy * 100) + '%';
+      try {
+        const { ApiClient } = await import('../../api.js');
+        const client = new ApiClient();
+        await client.request('/mind-galaxy/person/intimacy', {
+          method: 'PUT', body: JSON.stringify({ personId, intimacy }), headers: client.getHeaders()
+        });
+      } catch {}
+    });
+  });
+}
+
+// ── C35: 映射规则面板 ──
+function renderMappingPanel(body) {
+  const rules = JSON.parse(localStorage.getItem('mg_mapping_rules') || JSON.stringify({
+    nodeToBody: { theme: 'giant_star', person: 'planet_system', emotion: 'nebula', event: 'supernova' },
+    colorScheme: {},
+    spiralArms: 3,
+    windingTightness: 0.5
+  }));
+  body.innerHTML = `
+    <h4 style="margin:0 0 16px;color:#4fc3f7;">映射规则</h4>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#888;">节点类型 → 天体类型</label>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      ${Object.entries(rules.nodeToBody).map(([nodeType, bodyType]) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#1a1a2e;border-radius:4px;">
+          <span style="font-size:13px;">${nodeType}</span>
+          <select class="mapping-select" data-node="${nodeType}" style="padding:4px;background:#0f0f1e;border:1px solid #333;color:#ccc;border-radius:4px;">
+            ${['giant_star','dwarf_star','planet_system','nebula','black_hole','neutron_star','supernova','asteroid_belt','comet','galaxy_core'].map(t => `<option value="${t}" ${t === bodyType ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#888;">旋臂数: <span id="arm-val">${rules.spiralArms}</span></label>
+      <input type="range" id="spiral-arms" min="2" max="6" value="${rules.spiralArms}" style="width:100%;">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#888;">缠绕度: <span id="wind-val">${rules.windingTightness.toFixed(1)}</span></label>
+      <input type="range" id="winding-tightness" min="0" max="100" value="${Math.round(rules.windingTightness * 100)}" style="width:100%;">
+    </div>
+    <button id="save-mapping" style="padding:6px 16px;background:#4fc3f7;border:none;color:#000;border-radius:4px;cursor:pointer;">保存规则</button>
+    <button id="reset-mapping" style="padding:6px 16px;background:#555;border:none;color:#fff;border-radius:4px;cursor:pointer;margin-left:8px;">恢复默认</button>
+  `;
+
+  body.querySelector('#spiral-arms').addEventListener('input', (e) => {
+    document.getElementById('arm-val').textContent = e.target.value;
+  });
+  body.querySelector('#winding-tightness').addEventListener('input', (e) => {
+    document.getElementById('wind-val').textContent = (parseInt(e.target.value) / 100).toFixed(1);
+  });
+  body.querySelector('#save-mapping').addEventListener('click', () => {
+    const nodeToBody = {};
+    body.querySelectorAll('.mapping-select').forEach(s => { nodeToBody[s.dataset.node] = s.value; });
+    const newRules = {
+      nodeToBody,
+      spiralArms: parseInt(body.querySelector('#spiral-arms').value),
+      windingTightness: parseInt(body.querySelector('#winding-tightness').value) / 100
+    };
+    localStorage.setItem('mg_mapping_rules', JSON.stringify(newRules));
+    alert('映射规则已保存，下次生成星系时生效');
+  });
+  body.querySelector('#reset-mapping').addEventListener('click', () => {
+    localStorage.removeItem('mg_mapping_rules');
+    renderMappingPanel(body);
+  });
+}
+
+export { initSettings };

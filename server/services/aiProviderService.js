@@ -16,6 +16,10 @@ export async function callAi(opts) {
     systemPrompt = injectLengthToSystemPrompt(systemPrompt, lengthMode);
   }
 
+  if (config.localMode) {
+    throw new Error('本地分析模式已开启，LLM 调用已禁用');
+  }
+
   const isGemini = model.startsWith('gemini');
   const provider = isGemini ? 'gemini' : 'deepseek';
   const apiKey = customApiKey || (await getDecryptedKey(userId, provider)) || config[isGemini ? 'geminiKey' : 'deepseekKey'];

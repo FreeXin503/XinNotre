@@ -21,7 +21,6 @@
   "agent": {
     "plan": {
       "mode": "primary",
-      "model": "你的plan模型（如 opencode/某模型）",
       "permission": {
         "edit": "deny",
         "bash": "deny"
@@ -29,7 +28,6 @@
     },
     "build": {
       "mode": "primary",
-      "model": "你的build模型（如 opencode/某模型）",
       "permission": {
         "edit": "allow",
         "bash": "allow"

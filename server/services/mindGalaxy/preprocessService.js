@@ -200,3 +200,12 @@ export async function preprocess(userId, { sources, options = {} }) {
 
   return { records, segments: allSegments, meta };
 }
+
+export async function purgeRawText(userId, sourceRef) {
+  if (!sourceRef) {
+    const count = await repo.deleteAllDataSources(userId);
+    return { purged: count > 0, count };
+  }
+  const ok = await repo.deleteDataSourceByRef(userId, sourceRef);
+  return { purged: ok, count: ok ? 1 : 0 };
+}

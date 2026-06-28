@@ -36,5 +36,9 @@ export const config = Object.freeze({
   deepseekUrl: process.env.DEEPSEEK_URL || 'https://api.deepseek.com/chat/completions',
 
   // Qdrant 向量数据库（可选）
-  qdrantUrl: process.env.QDRANT_URL || ''
+  qdrantUrl: process.env.QDRANT_URL || '',
+
+  // 心智星系 · 隐私控制
+  localMode: process.env.LOCAL_MODE === 'true',
+  afterDelete: process.env.AFTER_DELETE === 'true'
 });

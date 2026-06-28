@@ -159,6 +159,7 @@ function updateDetailPanel(data) {
   if (content) {
     content.style.display = 'block';
     const meta = data.meta || {};
+    const bodyId = data.nodeId || data.id || '';
     content.innerHTML = `
       <div class="detail-header">
         <h3>${data.name}</h3>
@@ -171,8 +172,101 @@ function updateDetailPanel(data) {
         ${meta.theme ? `<p>重要度: ${meta.theme.importance || '-'} | 趋势: ${meta.theme.trend || '-'}</p>` : ''}
         ${meta.emotion ? `<p>情绪强度: ${meta.emotion.intensity || '-'}</p>` : ''}
       </div>
+      <div class="detail-actions">
+        <button class="detail-action-btn" data-action="rename" data-id="${bodyId}">重命名</button>
+        <button class="detail-action-btn" data-action="hide" data-id="${bodyId}">隐藏</button>
+        ${data.type === 'planet_system' ? `<button class="detail-action-btn" data-action="classify" data-id="${bodyId}">归类</button>` : ''}
+      </div>
     `;
+    bindDetailActions(bodyId);
   }
+}
+
+function bindDetailActions(bodyId) {
+  const content = document.getElementById('detail-content');
+  if (!content) return;
+  content.querySelector('.detail-action-btn[data-action="rename"]')?.addEventListener('click', () => {
+    const newName = prompt('输入新名称（最多20字符）：');
+    if (newName && newName.trim()) {
+      updateBodyName(bodyId, newName.trim().substring(0, 20));
+    }
+  });
+  content.querySelector('.detail-action-btn[data-action="hide"]')?.addEventListener('click', () => {
+    if (confirm('确定隐藏此星体？')) {
+      hideCelestialBody(bodyId);
+    }
+  });
+  content.querySelector('.detail-action-btn[data-action="classify"]')?.addEventListener('click', () => {
+    showClassifyPopup(bodyId);
+  });
+}
+
+async function updateBodyName(bodyId, newName) {
+  try {
+    const { ApiClient } = await import('../../api.js');
+    const client = new ApiClient();
+    const res = await client.request('/mind-galaxy/body/rename', {
+      method: 'PUT', body: JSON.stringify({ bodyId, newName }), headers: client.getHeaders()
+    });
+    if (res?.success) { location.reload(); }
+  } catch (e) { alert('重命名失败: ' + e.message); }
+}
+
+function hideCelestialBody(bodyId) {
+  const hidden = JSON.parse(localStorage.getItem('mg_hidden') || '[]');
+  if (!hidden.includes(bodyId)) hidden.push(bodyId);
+  localStorage.setItem('mg_hidden', JSON.stringify(hidden));
+  document.getElementById('canvas-container').querySelectorAll('[data-body-id="' + bodyId + '"]').forEach(el => {
+    const obj = scene.getObjectByProperty('userData.nodeId', bodyId) || scene.getObjectByProperty('userData.id', bodyId);
+    if (obj) obj.visible = false;
+  });
+  updateDetailPanel(null);
+}
+
+export function setBodyVisible(bodyId, visible) {
+  scene.traverse(obj => {
+    if (obj.userData?.nodeId === bodyId || obj.userData?.id === bodyId) {
+      obj.visible = visible;
+    }
+  });
+  const hidden = JSON.parse(localStorage.getItem('mg_hidden') || '[]');
+  if (visible) {
+    const idx = hidden.indexOf(bodyId);
+    if (idx >= 0) hidden.splice(idx, 1);
+  } else {
+    if (!hidden.includes(bodyId)) hidden.push(bodyId);
+  }
+  localStorage.setItem('mg_hidden', JSON.stringify(hidden));
+}
+
+function showClassifyPopup(bodyId) {
+  const topics = window.__mgTopics || [];
+  if (topics.length === 0) {
+    alert('暂无可用主题');
+    return;
+  }
+  const select = document.createElement('select');
+  select.innerHTML = '<option value="">选择主题...</option>' + topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a2e;padding:20px;border-radius:8px;z-index:1000;border:1px solid #333;';
+  wrapper.innerHTML = '<div style="margin-bottom:12px;color:#e0e0e0;">选择归类主题</div>';
+  wrapper.appendChild(select);
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = '确认';
+  confirmBtn.style.cssText = 'margin-top:10px;padding:6px 16px;background:#4fc3f7;border:none;border-radius:4px;cursor:pointer;';
+  confirmBtn.addEventListener('click', async () => {
+    if (!select.value) return;
+    try {
+      const { ApiClient } = await import('../../api.js');
+      const client = new ApiClient();
+      const res = await client.request('/mind-galaxy/body/classify', {
+        method: 'POST', body: JSON.stringify({ noteId: bodyId, topicId: select.value }), headers: client.getHeaders()
+      });
+      if (res?.success) { document.body.removeChild(wrapper); location.reload(); }
+    } catch (e) { alert('归类失败: ' + e.message); }
+  });
+  wrapper.appendChild(confirmBtn);
+  document.body.appendChild(wrapper);
 }
 
 // ── CSS2D 标签系统 ──

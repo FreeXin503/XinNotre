@@ -4,7 +4,10 @@ import {
   getGalaxyFromNotes, getGalaxyFromKnowledgeBase, getMixedGalaxy,
   analyzeGalaxy, analyzeGalaxyStream, getMindGraph, getV2Snapshot,
   generateV2Snapshot, getEvolution, getReport, saveConfig, getConfig,
-  listConfigs, deleteConfigHandler, exportGalaxy
+  listConfigs, deleteConfigHandler, exportGalaxy,
+  setPrivacySettings, getPrivacySettings, purgeAfterAnalysis,
+  renameBody, classifyNoteToTopic, setBodyVisibility, getHiddenBodies,
+  mergePersons, updatePersonIntimacy, listPersons
 } from '../controllers/mindGalaxyController.js';
 
 const router = Router();
@@ -37,5 +40,21 @@ router.delete('/config/:id', authMiddleware, deleteConfigHandler);
 
 // ── v2 导出 ──
 router.post('/export/:format', authMiddleware, exportGalaxy);
+
+// ── v2 隐私 ──
+router.get('/privacy', authMiddleware, getPrivacySettings);
+router.put('/privacy', authMiddleware, setPrivacySettings);
+router.post('/privacy/after-delete', authMiddleware, purgeAfterAnalysis);
+
+// ── v2 编辑 ──
+router.put('/body/rename', authMiddleware, renameBody);
+router.post('/body/classify', authMiddleware, classifyNoteToTopic);
+router.put('/body/visibility', authMiddleware, setBodyVisibility);
+router.get('/body/hidden', authMiddleware, getHiddenBodies);
+
+// ── v2 人物 ──
+router.post('/person/merge', authMiddleware, mergePersons);
+router.put('/person/intimacy', authMiddleware, updatePersonIntimacy);
+router.get('/person/list', authMiddleware, listPersons);
 
 export default router;

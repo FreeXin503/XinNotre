@@ -190,7 +190,35 @@ class MindGalaxyRepository {
     return rows;
   }
 
-  // ── 分析缓存 ─────────────────────────────────────────────
+  async deleteDataSourceByRef(userId, sourceRef) {
+    const { rows } = await this.q(
+      'DELETE FROM data_sources WHERE user_id = ? AND source_ref = ?',
+      [userId, sourceRef]
+    );
+    return rows.affectedRows > 0;
+  }
+
+  async deleteAllDataSources(userId) {
+    const { rows } = await this.q(
+      'DELETE FROM data_sources WHERE user_id = ?',
+      [userId]
+    );
+    return rows.affectedRows;
+  }
+
+  async updateBodyName(userId, bodyId, newName) {
+    const snapshot = await this.getLatestSnapshot(userId);
+    if (!snapshot?.snapshot_json) return false;
+    const json = typeof snapshot.snapshot_json === 'string'
+      ? JSON.parse(snapshot.snapshot_json) : snapshot.snapshot_json;
+    if (!json.bodies) return false;
+    const body = json.bodies.find(b => (b.id || b.nodeId) === bodyId);
+    if (!body) return false;
+    if (newName.length > 20) return false;
+    body.name = newName;
+    await this.saveSnapshot(userId, json);
+    return true;
+  }
 
   async upsertEmbeddingCache(userId, hash, vector, metadata) {
     const { rows } = await this.q(

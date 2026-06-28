@@ -6,12 +6,14 @@ import { setupSSE, sendSSE } from '../utils/sse.js';
 import {
   generateGalaxyFromNotes, generateGalaxyFromKnowledgeBase, generateMixedGalaxy
 } from '../services/mindGalaxyService.js';
-import { preprocess } from '../services/mindGalaxy/preprocessService.js';
+import { preprocess, purgeRawText } from '../services/mindGalaxy/preprocessService.js';
 import { analyzeBasic } from '../services/mindGalaxy/nlpBasicService.js';
 import { analyzeDeep } from '../services/mindGalaxy/nlpDeepService.js';
 import { buildMindGraph, saveGraph } from '../services/mindGalaxy/mindGraphService.js';
 import { mapToGalaxy } from '../services/mindGalaxy/galaxyMappingService.js';
 import configService from '../services/mindGalaxy/configService.js';
+import { generateReport } from '../services/mindGalaxy/reportService.js';
+import { exportData, exportReportPDF } from '../services/mindGalaxy/exportService.js';
 import MindGalaxyRepository from '../repositories/mindGalaxyRepository.js';
 
 const repo = new MindGalaxyRepository();
@@ -187,9 +189,16 @@ export const getReport = asyncHandler(async (req, res) => {
   const { snapshotId } = req.params;
   if (!snapshotId) return fail(res, '缺少 snapshotId', 400);
 
-  const report = await repo.getReportBySnapshotId(userId, snapshotId);
-  if (!report) return fail(res, '暂未生成报告', 404);
-  return success(res, report);
+  let report = await repo.getReportBySnapshotId(userId, snapshotId);
+  if (!report) {
+    try {
+      const generated = await generateReport(userId, snapshotId);
+      return success(res, generated);
+    } catch (err) {
+      return fail(res, `报告生成失败: ${err.message}`, 500);
+    }
+  }
+  return success(res, report.report_json || report);
 });
 
 // ── v2: 配置 CRUD ──
@@ -226,20 +235,169 @@ export const deleteConfigHandler = asyncHandler(async (req, res) => {
 export const exportGalaxy = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { format } = req.params;
-  const { body } = req;
+  const { reportId } = req.body || {};
 
-  if (!['json', 'picture'].includes(format)) {
+  if (!['json', 'csv', 'pdf', 'picture'].includes(format)) {
     return fail(res, `不支持的格式: ${format}`, 400);
   }
 
-  if (format === 'json') {
-    const snap = await repo.getLatestSnapshot(userId);
-    if (!snap) return fail(res, '暂无快照', 404);
-    return success(res, { format: 'json', data: snap });
-  }
+  try {
+    if (format === 'json' || format === 'csv') {
+      const result = await exportData(userId, format);
+      if (result.contentType === 'application/json') {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+        return res.send(result.data);
+      }
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      return res.send(result.data);
+    }
 
-  // picture: 返回示意
-  return success(res, { format: 'picture', message: '请使用前端 canvas 导出功能' });
+    if (format === 'pdf') {
+      if (!reportId) return fail(res, '缺少 reportId', 400);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="mind-galaxy-report-${reportId}.pdf"`);
+      await exportReportPDF(userId, reportId, res);
+      return;
+    }
+
+    // picture: 降级前端导出
+    return success(res, { format: 'picture', message: '请使用前端 canvas 导出功能' });
+  } catch (err) {
+    return fail(res, `导出失败: ${err.message}`, 500);
+  }
+});
+
+// ── v2: 隐私控制 ──
+export const setPrivacySettings = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { localMode, afterDelete } = req.body || {};
+  if (typeof localMode !== 'undefined') {
+    await repo.saveConfig(userId, { name: '_privacy', privacyMode: localMode ? 'local' : 'cloud', id: '_privacy' });
+  }
+  if (typeof afterDelete !== 'undefined') {
+    const cfg = await repo.getConfig(userId, '_privacy');
+    await repo.saveConfig(userId, { ...(cfg?.config_json || {}), name: '_privacy', id: '_privacy', deleteAfterAnalysis: !!afterDelete });
+  }
+  return success(res, { localMode: localMode ?? null, afterDelete: afterDelete ?? null });
+});
+
+export const getPrivacySettings = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const cfg = await repo.getConfig(userId, '_privacy');
+  const json = cfg?.config_json || {};
+  return success(res, { localMode: json.privacyMode === 'local', afterDelete: !!json.deleteAfterAnalysis });
+});
+
+export const purgeAfterAnalysis = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { sourceRef } = req.body || {};
+  const result = await purgeRawText(userId, sourceRef || null);
+  return success(res, result);
+});
+
+// ── v2: 星体编辑 ──
+export const renameBody = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { bodyId, newName } = req.body || {};
+  if (!bodyId || !newName || typeof newName !== 'string') return fail(res, '缺少 bodyId 或 newName', 400);
+  if (newName.length > 20) return fail(res, '名称不能超过 20 个字符', 400);
+  const ok = await repo.updateBodyName(userId, bodyId, newName.trim());
+  if (!ok) return fail(res, '星体不存在或更新失败', 404);
+  return success(res, { renamed: true, bodyId, newName: newName.trim() });
+});
+
+export const classifyNoteToTopic = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { noteId, topicId } = req.body || {};
+  if (!noteId || !topicId) return fail(res, '缺少 noteId 或 topicId', 400);
+  const snapshot = await repo.getLatestSnapshot(userId);
+  if (!snapshot?.snapshot_json) return fail(res, '暂无星系快照', 404);
+  const json = typeof snapshot.snapshot_json === 'string'
+    ? JSON.parse(snapshot.snapshot_json) : snapshot.snapshot_json;
+  if (!json.bodies) return fail(res, '星系数据异常', 500);
+  const planet = json.bodies.find(b => (b.nodeId || b.id) === noteId);
+  if (!planet) return fail(res, '便签节点不存在', 404);
+  planet.topicId = topicId;
+  planet.manual = true;
+  await repo.saveSnapshot(userId, json);
+  return success(res, { classified: true, noteId, topicId });
+});
+
+export const setBodyVisibility = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { bodyId, visible } = req.body || {};
+  if (!bodyId || typeof visible !== 'boolean') return fail(res, '缺少 bodyId 或 visible', 400);
+  const cfg = await repo.getConfig(userId, '_privacy');
+  const configJson = cfg?.config_json || {};
+  const hiddenIds = configJson.hiddenNodeIds || [];
+  if (visible) {
+    const idx = hiddenIds.indexOf(bodyId);
+    if (idx >= 0) hiddenIds.splice(idx, 1);
+  } else {
+    if (!hiddenIds.includes(bodyId)) hiddenIds.push(bodyId);
+  }
+  await repo.saveConfig(userId, {
+    name: '_privacy', id: '_privacy', hiddenNodeIds: hiddenIds,
+    privacyMode: configJson.privacyMode || 'cloud', deleteAfterAnalysis: !!configJson.deleteAfterAnalysis
+  });
+  return success(res, { bodyId, visible, hiddenCount: hiddenIds.length });
+});
+
+export const getHiddenBodies = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const cfg = await repo.getConfig(userId, '_privacy');
+  const json = cfg?.config_json || {};
+  return success(res, { hiddenNodeIds: json.hiddenNodeIds || [] });
+});
+
+// ── v2: 人物管理 ──
+export const mergePersons = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { personIdA, personIdB } = req.body || {};
+  if (!personIdA || !personIdB) return fail(res, '缺少 personIdA 或 personIdB', 400);
+  const snapshot = await repo.getLatestSnapshot(userId);
+  if (!snapshot?.snapshot_json) return fail(res, '暂无星系快照', 404);
+  const json = typeof snapshot.snapshot_json === 'string'
+    ? JSON.parse(snapshot.snapshot_json) : snapshot.snapshot_json;
+  const bodies = json.bodies || [];
+  const target = bodies.find(b => (b.id || b.nodeId) === personIdA);
+  const source = bodies.find(b => (b.id || b.nodeId) === personIdB);
+  if (!target || !source) return fail(res, '人物不存在', 404);
+  if (target.type !== 'person' || source.type !== 'person') return fail(res, '只能合并人物类型节点', 400);
+  target.meta = target.meta || {};
+  target.meta.mergedFrom = [...(target.meta.mergedFrom || []), personIdB];
+  target.intimacy = Math.max(target.intimacy || 0, source.intimacy || 0);
+  json.bodies = bodies.filter(b => (b.id || b.nodeId) !== personIdB);
+  await repo.saveSnapshot(userId, json);
+  return success(res, { merged: personIdB, into: personIdA });
+});
+
+export const updatePersonIntimacy = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { personId, intimacy } = req.body || {};
+  if (!personId || typeof intimacy !== 'number') return fail(res, '缺少 personId 或 intimacy', 400);
+  if (intimacy < 0 || intimacy > 1) return fail(res, '亲密度范围 0-1', 400);
+  const snapshot = await repo.getLatestSnapshot(userId);
+  if (!snapshot?.snapshot_json) return fail(res, '暂无星系快照', 404);
+  const json = typeof snapshot.snapshot_json === 'string'
+    ? JSON.parse(snapshot.snapshot_json) : snapshot.snapshot_json;
+  const person = (json.bodies || []).find(b => (b.id || b.nodeId) === personId);
+  if (!person || person.type !== 'person') return fail(res, '人物不存在', 404);
+  person.intimacy = intimacy;
+  await repo.saveSnapshot(userId, json);
+  return success(res, { personId, intimacy });
+});
+
+export const listPersons = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const snapshot = await repo.getLatestSnapshot(userId);
+  if (!snapshot?.snapshot_json) return success(res, { persons: [] });
+  const json = typeof snapshot.snapshot_json === 'string'
+    ? JSON.parse(snapshot.snapshot_json) : snapshot.snapshot_json;
+  const persons = (json.bodies || []).filter(b => b.type === 'person');
+  return success(res, { persons });
 });
 
 export default {
@@ -248,5 +406,11 @@ export default {
   // v2
   analyzeGalaxy, analyzeGalaxyStream, getMindGraph, getV2Snapshot,
   generateV2Snapshot, getEvolution, getReport,
-  saveConfig, getConfig, listConfigs, deleteConfigHandler, exportGalaxy
+  saveConfig, getConfig, listConfigs, deleteConfigHandler, exportGalaxy,
+  // privacy
+  setPrivacySettings, getPrivacySettings, purgeAfterAnalysis,
+  // edit
+  renameBody, classifyNoteToTopic, setBodyVisibility, getHiddenBodies,
+  // person
+  mergePersons, updatePersonIntimacy, listPersons
 };
