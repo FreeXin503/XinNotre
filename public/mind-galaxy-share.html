@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心智星系 - 分享</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;font-family:'Noto Serif SC',serif;}
+#canvas-container{width:100vw;height:100vh;}
+#info-bar{position:fixed;top:0;left:0;right:0;padding:12px 16px;background:linear-gradient(to bottom,hsla(240,20%,5%,0.9),transparent);z-index:10;display:flex;justify-content:space-between;align-items:center;color:#e0e0e0;font-size:0.85rem;}
+#info-bar h1{font-size:1rem;font-weight:400;margin:0;}
+#loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:0.9rem;}
+</style>
+</head>
+<body>
+<div id="info-bar">
+  <h1>心智星系 Mind Galaxy</h1>
+  <span id="galaxy-type"></span>
+</div>
+<div id="canvas-container">
+  <div id="loading">载入星系中...</div>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.147.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.147.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const token = new URLSearchParams(location.search).get('token');
+if (!token) { document.getElementById('loading').textContent = '缺少分享 Token'; }
+else { init(token); }
+
+async function init(token) {
+  try {
+    const res = await fetch(`/api/share/${token}`);
+    const data = await res.json();
+    if (!data.success || !data.data?.snapshot) throw new Error(data.error || '数据加载失败');
+    const snapshot = data.data.snapshot;
+
+    document.getElementById('galaxy-type').textContent = `哈勃类型: ${snapshot.galaxyType || 'S'} · ${snapshot.bodies?.length || 0} 天体`;
+    document.getElementById('loading').style.display = 'none';
+
+    const container = document.getElementById('canvas-container');
+    const scenes = THREE;
+
+    const scene = new scenes.Scene();
+    const camera = new scenes.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.5, 500);
+    camera.position.set(0, 25, 50);
+
+    const renderer = new scenes.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.toneMapping = scenes.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.maxDistance = 200;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.3;
+
+    // Lighting
+    scene.add(new scenes.AmbientLight(0x222244, 0.6));
+    const dir = new scenes.DirectionalLight(0xffffff, 0.4);
+    dir.position.set(30, 30, 30);
+    scene.add(dir);
+
+    // Skybox
+    const cubeLoader = new scenes.CubeTextureLoader();
+    const size = 512;
+    const black = new Uint8Array([0,0,0,255]);
+    const dark = new Uint8Array([2,2,8,255]);
+    const img = { width: size, height: size };
+    const px = dark, nx = dark, py = dark, ny = black, pz = dark, nz = dark;
+    const cubeMap = new scenes.CubeTexture([px,nx,py,ny,pz,nz].map(() => {
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      for (let i = 0; i < 200; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        const r = 1 + Math.random() * 2;
+        ctx.fillStyle = `rgba(${100+Math.random()*155},${100+Math.random()*155},${150+Math.random()*105},${0.3+Math.random()*0.7})`;
+        ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+      }
+      return c;
+    }));
+    scene.background = cubeMap;
+
+    // Stars
+    const starGeo = new scenes.BufferGeometry();
+    const n = 2000, pos = new Float32Array(n*3);
+    for (let i=0;i<n;i++) {
+      const r = 50+Math.random()*150, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+      pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.sin(ph)*Math.sin(th);pos[i*3+2]=r*Math.cos(ph);
+    }
+    starGeo.setAttribute('position', new scenes.BufferAttribute(pos,3));
+    scene.add(new scenes.Points(starGeo, new scenes.PointsMaterial({size:0.3,color:0xffffff,blending:scenes.AdditiveBlending,depthWrite:false})));
+
+    // Build bodies
+    const FACTORY = {
+      black_hole(body){ const g=scenes.Group();const geo=new scenes.SphereGeometry(body.visual.radius||3,32,32);const mat=new scenes.MeshBasicMaterial({color:new scenes.Color(body.visual.colorHex||'#000')});const m=new scenes.Mesh(geo,mat);g.add(m);return{group:g,body,dispose(){geo.dispose();mat.dispose();}};},
+      giant_star(body){ const g=scenes.Group();const geo=new scenes.SphereGeometry(body.visual.radius||2,32,32);const mat=new scenes.MeshStandardMaterial({color:new scenes.Color(body.visual.colorHex||'#fff'),emissive:new scenes.Color(body.visual.colorHex||'#fff'),emissiveIntensity:body.visual.emissiveIntensity||1,roughness:0.6});const m=new scenes.Mesh(geo,mat);g.add(m);return{group:g,body,dispose(){geo.dispose();mat.dispose();}};},
+      planet_system(body){ const g=scenes.Group();const geo=new scenes.SphereGeometry(body.visual.radius||1,24,24);const mat=new scenes.MeshStandardMaterial({color:new scenes.Color(body.visual.colorHex||'#fff'),emissive:new scenes.Color(body.visual.colorHex||'#fff'),emissiveIntensity:0.5,roughness:0.5});const m=new scenes.Mesh(geo,mat);g.add(m);return{group:g,body,dispose(){geo.dispose();mat.dispose();}};},
+      nebula(body){ const g=scenes.Group();const radius=body.visual.radius||0.2;const dens=body.visual.density||0.5;const n=Math.floor((body.visual.particleCount||2000)*dens);const p=new Float32Array(n*3);for(let i=0;i<n;i++){const r=radius*Math.cbrt(Math.random());const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1);p[i*3]=r*Math.sin(ph)*Math.cos(th);p[i*3+1]=r*Math.sin(ph)*Math.sin(th);p[i*3+2]=r*Math.cos(ph);}const geo=new scenes.BufferGeometry();geo.setAttribute('position',new scenes.BufferAttribute(p,3));const mat=new scenes.PointsMaterial({size:0.15,color:new scenes.Color(body.visual.colorHex||'#fff'),blending:scenes.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.6});g.add(new scenes.Points(geo,mat));return{group:g,body,dispose(){geo.dispose();mat.dispose();}};},
+      main_sequence(body){ return FACTORY.giant_star(body); },
+      asteroid_belt(body){ return FACTORY.nebula(body); },
+      binary_companion(body){ return FACTORY.giant_star(body); },
+      dark_matter(body){ return FACTORY.nebula(body); },
+      supernova_remnant(body){ return FACTORY.nebula(body); },
+      neutron_star(body){ const g=scenes.Group();const geo=new scenes.SphereGeometry(body.visual.radius||0.2,16,16);const mat=new scenes.MeshBasicMaterial({color:new scenes.Color(body.visual.colorHex||'#fff')});g.add(new scenes.Mesh(geo,mat));return{group:g,body,dispose(){geo.dispose();mat.dispose();}}; }
+    };
+
+    function spiralPos(body,bodies,armIdx){
+      const idx=bodies.indexOf(body);const total=bodies.length;const armAngle=armIdx*(Math.PI*2/3);const r=3+idx*2.5;const angle=armAngle+idx*0.5;return[Math.cos(angle)*r,2*Math.sin(angle)*0.8,Math.sin(angle)*r];
+    }
+
+    const bodies=snapshot.bodies||[];
+    bodies.forEach((body,i)=>{
+      if(!body.position||body.position.every(v=>v===0)){
+        body.position=spiralPos(body,bodies,i%3);
+      }
+      const factory=FACTORY[body.type];
+      if(!factory)return;
+      const item=factory(body);
+      item.group.position.set(body.position[0],body.position[1],body.position[2]);
+      item.group.traverse(obj=>{if(obj.isMesh){obj.userData=body;obj.userData.clickable=true;obj.userData.name=body.name;obj.userData.type=body.type;}});
+      scene.add(item.group);
+    });
+
+    function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}
+    animate();
+
+    window.addEventListener('resize',()=>{
+      camera.aspect=container.clientWidth/container.clientHeight;camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth,container.clientHeight);
+    });
+  } catch(e){
+    document.getElementById('loading').textContent='加载失败: '+e.message;
+  }
+}
+</script>
+</body>
+</html>

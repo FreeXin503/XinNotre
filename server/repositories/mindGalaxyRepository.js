@@ -87,6 +87,17 @@ class MindGalaxyRepository {
     return row;
   }
 
+  async getSnapshotById(snapshotId) {
+    const { rows } = await this.q(
+      'SELECT * FROM cosmos_snapshots WHERE id = ?',
+      [snapshotId]
+    );
+    if (!rows.length) return null;
+    const row = rows[0];
+    try { row.snapshot_json = typeof row.snapshot_json === 'string' ? JSON.parse(row.snapshot_json) : row.snapshot_json; } catch {}
+    return row;
+  }
+
   async listSnapshots(userId, limit = 12) {
     const clamped = Math.min(Math.max(1, limit), 100);
     const { rows } = await this.q(

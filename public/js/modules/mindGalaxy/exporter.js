@@ -13,6 +13,28 @@ export function initExporter(rs) {
   if (btnJson) {
     btnJson.addEventListener('click', () => exportJson());
   }
+
+  // B3: view presets
+  document.getElementById('btn-reset')?.addEventListener('click', () => {
+    import('./interaction.js').then(m => m.flyToPreset('panoramic'));
+  });
+  document.getElementById('btn-preset-core')?.addEventListener('click', () => {
+    import('./interaction.js').then(m => m.flyToPreset('coreFocus'));
+  });
+  document.getElementById('btn-preset-side')?.addEventListener('click', () => {
+    import('./interaction.js').then(m => m.flyToPreset('sideView'));
+  });
+  document.getElementById('btn-preset-top')?.addEventListener('click', () => {
+    import('./interaction.js').then(m => m.flyToPreset('topDown'));
+  });
+  document.getElementById('btn-preset-fp')?.addEventListener('click', () => {
+    import('./interaction.js').then(m => m.flyToPreset('firstPerson'));
+  });
+
+  // C10: video export
+  document.getElementById('btn-export-video')?.addEventListener('click', () => {
+    exportVideo(rs.renderer, 15, 30);
+  });
 }
 
 function exportImage(renderer, resolution = '1080p') {
@@ -231,5 +253,71 @@ export function exportOBJ(scene) {
     showToast('OBJ 已导出');
   } catch (err) {
     showToast('OBJ 导出失败: ' + err.message, true);
+  }
+}
+
+// ── C10: 视频导出 ──
+
+let _videoRecorder = null;
+let _videoChunks = [];
+
+export function exportVideo(renderer, durationSec = 15, fps = 30) {
+  if (!renderer) return;
+  const canvas = renderer.domElement;
+  if (!canvas.captureStream) {
+    showToast('当前浏览器不支持视频录制', true);
+    return;
+  }
+
+  if (_videoRecorder?.state === 'recording') {
+    _videoRecorder.stop();
+    showToast('录制已停止');
+    return;
+  }
+
+  _videoChunks = [];
+  const stream = canvas.captureStream(fps);
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9'
+    : 'video/webm';
+
+  try {
+    _videoRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+  } catch {
+    _videoRecorder = new MediaRecorder(stream);
+  }
+
+  _videoRecorder.ondataavailable = (e) => { if (e.data.size > 0) _videoChunks.push(e.data); };
+  _videoRecorder.onstop = () => {
+    const blob = new Blob(_videoChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `mind-galaxy-${Date.now()}.webm`;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast('视频已导出');
+    _videoRecorder = null;
+  };
+
+  showToast(`开始录制 ${durationSec}s`);
+
+  const recordBtn = document.getElementById('btn-export-video');
+  if (recordBtn) recordBtn.textContent = '停止';
+
+  _videoRecorder.start();
+  setTimeout(() => {
+    if (_videoRecorder?.state === 'recording') {
+      _videoRecorder.stop();
+      if (recordBtn) recordBtn.textContent = '视频';
+    }
+  }, durationSec * 1000);
+}
+
+export function stopVideo() {
+  if (_videoRecorder?.state === 'recording') {
+    _videoRecorder.stop();
   }
 }

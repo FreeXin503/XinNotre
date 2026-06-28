@@ -89,6 +89,9 @@ export function initUI() {
     document.getElementById('detail-content').style.display = 'none';
   });
 
+  // Evolution timeline load button
+  document.getElementById('btn-load-evolution')?.addEventListener('click', loadEvolutionTimeline);
+
   // Bottom panel toggle
   document.querySelector('#bottom-panel .bottom-toggle')?.addEventListener('click', () => {
     document.getElementById('bottom-panel')?.classList.toggle('collapsed');
@@ -104,6 +107,28 @@ export function initUI() {
   }
 
   initSettings();
+}
+
+// ── B8: 演化时间轴加载 ──
+
+export async function loadEvolutionTimeline() {
+  const markersEl = document.getElementById('evolution-markers');
+  if (!markersEl) return;
+  markersEl.innerHTML = '<span style="color:#888;font-size:0.75rem;">加载中...</span>';
+
+  try {
+    const { ApiClient } = await import('../../api.js');
+    const client = new ApiClient();
+    const res = await client.request('/mind-galaxy/evolution', { headers: client.getHeaders() });
+    if (!res?.success || !res.data?.snapshots) throw new Error('无演化数据');
+    const { setSnapshots, replaceWithSnapshot } = await import('./index.js');
+    setSnapshots(res.data.snapshots);
+    if (res.data.snapshots.length > 0) {
+      await replaceWithSnapshot(res.data.snapshots.length - 1, false);
+    }
+  } catch (e) {
+    if (markersEl) markersEl.innerHTML = `<span style="color:#e57373;font-size:0.75rem;">加载失败: ${e.message}</span>`;
+  }
 }
 
 // ── 时间控制 ─────────────────────────────────────────────

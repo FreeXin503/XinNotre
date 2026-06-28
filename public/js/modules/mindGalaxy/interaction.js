@@ -25,6 +25,8 @@ export function initInteraction(rs) {
   window.addEventListener('click', onClick);
   window.addEventListener('dblclick', onDoubleClick);
   window.addEventListener('keydown', onKeyDown);
+
+  initSearch();
 }
 
 export function disposeInteraction() {
@@ -129,6 +131,46 @@ export function focusOnBody(targetPos, distance = 5) {
     duration: 1.2
   };
   controls.enabled = false;
+}
+
+// ── B3: 相机视角预设 ──
+
+export const CAMERA_PRESETS = {
+  panoramic: { pos: [0, 30, 60], target: [0, 0, 0] },
+  coreFocus: { pos: [0, 5, 15], target: [0, 0, 0] },
+  sideView: { pos: [50, 0, 0], target: [0, 0, 0] },
+  topDown: { pos: [0, 80, 1], target: [0, 0, 0] },
+  firstPerson: { pos: [0, 2, 5], target: [0, 2, 0] }
+};
+
+export function flyToPreset(name, duration = 1.0) {
+  if (!camera || !controls) return;
+  const preset = CAMERA_PRESETS[name];
+  if (!preset) return;
+  if (name === 'firstPerson') {
+    const existing = document.getElementById('vr-reserved-toast');
+    if (!existing) {
+      const toast = document.createElement('div');
+      toast.id = 'vr-reserved-toast';
+      toast.textContent = 'VR 模式预留';
+      toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:hsla(260,60%,30%,0.9);color:#e0e0e0;padding:0.5rem 1.5rem;border-radius:2rem;font-size:0.85rem;z-index:100;pointer-events:none;';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2000);
+    }
+  }
+  const T = window.THREE;
+  cameraTween = {
+    start: camera.position.clone(),
+    end: new T.Vector3(...preset.pos),
+    targetStart: controls.target.clone(),
+    targetEnd: new T.Vector3(...preset.target),
+    progress: 0,
+    duration
+  };
+  controls.enabled = (name === 'firstPerson');
+  if (name === 'firstPerson') {
+    setTimeout(() => { controls.enabled = true; }, duration * 1000 + 200);
+  }
 }
 
 export function updateInteraction(delta) {
@@ -267,6 +309,100 @@ function showClassifyPopup(bodyId) {
   });
   wrapper.appendChild(confirmBtn);
   document.body.appendChild(wrapper);
+}
+
+// ── B4: 搜索与过滤 ──
+
+let _flashTimer = null;
+
+export function initSearch() {
+  const searchInput = document.getElementById('search-input');
+  const typeFilter = document.getElementById('search-type-filter');
+  const clearBtn = document.getElementById('btn-clear-search');
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const keyword = searchInput.value.trim();
+      if (keyword) {
+        if (typeFilter) typeFilter.value = '';
+        filterByType('');
+        searchAndHighlight(keyword);
+      } else {
+        clearSearch();
+      }
+    });
+  }
+
+  if (typeFilter) {
+    typeFilter.addEventListener('change', () => {
+      const type = typeFilter.value;
+      if (type) {
+        if (searchInput) searchInput.value = '';
+        clearSearch();
+        filterByType(type);
+      } else {
+        filterByType('');
+      }
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', clearSearch);
+  }
+}
+
+function searchAndHighlight(keyword) {
+  if (!scene || !camera || !controls) return;
+  if (_flashTimer) clearTimeout(_flashTimer);
+
+  const lower = keyword.toLowerCase();
+  const matches = [];
+  scene.traverse(obj => {
+    if (obj.userData?.name && obj.userData.name.toLowerCase().includes(lower)) {
+      matches.push(obj);
+    }
+  });
+
+  if (matches.length === 0) return;
+
+  let flashCount = 0;
+  function flash() {
+    if (flashCount >= 6) {
+      matches.forEach(m => { if (m.material) m.material.wireframe = false; });
+      return;
+    }
+    const isOn = flashCount % 2 === 0;
+    matches.forEach(m => {
+      if (m.material) m.material.wireframe = isOn;
+    });
+    flashCount++;
+    _flashTimer = setTimeout(flash, 200);
+  }
+  flash();
+
+  const firstMatch = matches[0];
+  const pos = firstMatch.getWorldPosition(new (window.THREE).Vector3());
+  if (pos) focusOnBody(pos, 3);
+}
+
+function filterByType(type) {
+  if (!scene) return;
+  scene.traverse(obj => {
+    if (obj.userData?.type) {
+      obj.visible = !type || obj.userData.type === type;
+    }
+  });
+}
+
+function clearSearch() {
+  if (_flashTimer) clearTimeout(_flashTimer);
+  const si = document.getElementById('search-input');
+  const sf = document.getElementById('search-type-filter');
+  if (si) si.value = '';
+  if (sf) sf.value = '';
+  if (scene) {
+    scene.traverse(obj => { if (obj.userData?.type) obj.visible = true; });
+  }
 }
 
 // ── CSS2D 标签系统 ──

@@ -108,6 +108,186 @@ function applyTimeAnimation(t) {
   }
 }
 
+// ── B8: 演化时间轴 ──
+
+let _currentSnapshot = null;
+let _snapshots = [];
+
+export function setSnapshots(snaps) {
+  _snapshots = snaps || [];
+  renderEvolutionMarkers();
+}
+
+function renderEvolutionMarkers() {
+  const container = document.getElementById('evolution-markers');
+  if (!container) return;
+  if (_snapshots.length === 0) {
+    container.innerHTML = '<span style="color:#888;font-size:0.75rem;">暂无演化快照</span>';
+    return;
+  }
+  const prevType = { val: null };
+  container.innerHTML = _snapshots.map((snap, i) => {
+    const json = typeof snap.snapshot_json === 'string' ? JSON.parse(snap.snapshot_json) : snap.snapshot_json;
+    const type = json?.galaxyType || '?';
+    const isKey = prevType.val !== type;
+    prevType.val = type;
+    const date = snap.created_at ? new Date(snap.created_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : '?';
+    return `<div class="evo-marker ${isKey ? 'key' : ''}" data-index="${i}" title="${type}型 · ${date}" style="${isKey ? 'border:2px solid #4fc3f7;' : ''}">
+      <div class="evo-dot" style="background:${type === 'S' ? '#4fc3f7' : type === 'SB' ? '#ff9800' : '#888'};width:${isKey ? '14px' : '8px'};height:${isKey ? '14px' : '8px'}"></div>
+      <span style="font-size:0.65rem;color:#aaa;margin-top:4px;">${date}</span>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('.evo-marker').forEach(marker => {
+    marker.addEventListener('click', async () => {
+      const idx = parseInt(marker.dataset.index);
+      await replaceWithSnapshot(idx);
+    });
+  });
+}
+
+export async function replaceWithSnapshot(index, smooth = false) {
+  const snap = _snapshots[index];
+  if (!snap) return;
+  const json = typeof snap.snapshot_json === 'string' ? JSON.parse(snap.snapshot_json) : snap.snapshot_json;
+  if (!json?.bodies) return;
+
+  if (smooth && _currentSnapshot) {
+    await transitionToSnapshot(json, 800);
+    _currentSnapshot = json;
+    return;
+  }
+
+  _currentSnapshot = json;
+  disposeLabels();
+  celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
+  celestialItems.length = 0;
+  orbitLines.forEach(line => { if (line) disposeOrbitLine(line); });
+  orbitLines.length = 0;
+
+  const newItems = buildGalaxy(json);
+  celestialItems.push(...newItems);
+
+  const parentPositions = new Map();
+  for (const item of celestialItems) {
+    if (item.body && item.body.type !== 'planet_system') {
+      parentPositions.set(item.body.id, item.group.position.clone());
+    }
+  }
+  for (const item of celestialItems) {
+    if (item.body?.type === 'planet_system' && item.body.motion?.parentBodyId) {
+      const parentPos = parentPositions.get(item.body.motion.parentBodyId);
+      const line = createOrbitLine(item.body, parentPos || new window.THREE.Vector3(0, 0, 0));
+      if (line) { scene.add(line); orbitLines.push(line); }
+    }
+  }
+
+  newItems.forEach(item => {
+    item.group.traverse(obj => {
+      if (obj.isMesh && obj.material && item.body) {
+        obj.userData = { ...item.body, clickable: true };
+      }
+    });
+  });
+
+  initLabels(rs, celestialItems);
+  const isLabelsActive = document.getElementById('btn-labels')?.classList.contains('active');
+  setLabelsVisible(!!isLabelsActive);
+}
+
+// ── C17: 演化插值动画 ──
+
+async function transitionToSnapshot(nextJson, durationMs = 800) {
+  const T = window.THREE;
+  const currentIds = new Map();
+  celestialItems.forEach(item => {
+    if (item.body) currentIds.set(item.body.id || item.body.nodeId, item);
+  });
+
+  const nextBodies = nextJson.bodies || [];
+  const nextIds = new Set(nextBodies.map(b => b.id || b.nodeId));
+
+  const disappearItems = [];
+  const appearBodies = [];
+  const keepPairs = [];
+
+  for (const [id, item] of currentIds) {
+    if (!nextIds.has(id)) disappearItems.push(item);
+    else {
+      const next = nextBodies.find(b => (b.id || b.nodeId) === id);
+      if (next) keepPairs.push({ item, next, id });
+    }
+  }
+  for (const body of nextBodies) {
+    const id = body.id || body.nodeId;
+    if (!currentIds.has(id)) appearBodies.push(body);
+  }
+
+  const startTime = performance.now();
+
+  return new Promise(resolve => {
+    function step(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / durationMs);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+      disappearItems.forEach(item => {
+        const s = (1 - ease);
+        item.group.scale.set(s, s, s);
+      });
+
+      appearBodies.forEach(body => {
+        const factory = FACTORY[body.type];
+        if (!factory) return;
+        const s = ease;
+        if (t < 0.02) {
+          if (!body.position || body.position.every(v => v === 0)) {
+            body.position = spiralPosition(body, nextBodies);
+          }
+          const item = factory(body);
+          item.group.position.set(body.position[0], body.position[1], body.position[2]);
+          item.body = body;
+          item.group.scale.set(0.01, 0.01, 0.01);
+          scene.add(item.group);
+          body._newItem = item;
+        }
+        if (body._newItem) {
+          body._newItem.group.scale.set(s, s, s);
+          body._newItem.group.traverse(obj => {
+            if (obj.isMesh) {
+              if (obj.material.opacity != null) obj.material.opacity = s;
+            }
+          });
+        }
+      });
+
+      keepPairs.forEach(({ item, next }) => {
+        if (next.visual?.colorHex && item.body?.visual?.colorHex && next.visual.colorHex !== item.body.visual.colorHex) {
+          const from = new T.Color(item.body.visual.colorHex);
+          const to = new T.Color(next.visual.colorHex);
+          const lerped = from.clone().lerp(to, ease);
+          item.group.traverse(obj => {
+            if (obj.isMesh && obj.material.color) obj.material.color.copy(lerped);
+          });
+        }
+      });
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        disappearItems.forEach(item => { if (item.dispose) item.dispose(); });
+        celestialItems.length = 0;
+        celestialItems.push(...(nextBodies.map(b => b._newItem).filter(Boolean)));
+        keepPairs.forEach(({ item }) => celestialItems.push(item));
+        appearBodies.forEach(b => { delete b._newItem; });
+        _currentSnapshot = nextJson;
+        resolve();
+      }
+    }
+    requestAnimationFrame(step);
+  });
+}
+
 // ── animate ──
 function animate() {
   animFrameId = requestAnimationFrame(animate);

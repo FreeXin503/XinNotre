@@ -26,6 +26,11 @@ let _origEmissive = null;
 let _tooltipEl = null;
 let _onMouseMoveFn = null;
 let _onMouseLeaveFn = null;
+let _onClickFn = null;
+let _onDblClickFn = null;
+let _detailPanel = null;
+let _detailPanelEl = null;
+let _cameraTween = null;
 
 // 3D 对象引用（用于动画和清理）
 let sunGroup = null;
@@ -52,11 +57,27 @@ export function unmountCosmos() {
   if (renderer?.domElement && _onMouseLeaveFn) {
     renderer.domElement.removeEventListener('mouseleave', _onMouseLeaveFn);
   }
+  if (renderer?.domElement && _onClickFn) {
+    renderer.domElement.removeEventListener('click', _onClickFn);
+  }
+  if (renderer?.domElement && _onDblClickFn) {
+    renderer.domElement.removeEventListener('dblclick', _onDblClickFn);
+  }
   _onMouseMoveFn = null;
   _onMouseLeaveFn = null;
+  _onClickFn = null;
+  _onDblClickFn = null;
   hoveredObj = null;
   _origEmissive = null;
   raycaster = null;
+
+  // 清理 detail panel
+  if (_detailPanelEl?.parentNode) {
+    _detailPanelEl.parentNode.removeChild(_detailPanelEl);
+  }
+  _detailPanelEl = null;
+  _detailPanel = null;
+  _cameraTween = null;
 
   // 清理 tooltip
   if (_tooltipEl?.parentNode) {
@@ -292,6 +313,112 @@ function initThreeScene(container) {
 
   renderer.domElement.addEventListener('mousemove', _onMouseMoveFn, { passive: true });
   renderer.domElement.addEventListener('mouseleave', _onMouseLeaveFn);
+
+  // ── B6: 点击详情面板 ──
+  _detailPanelEl = document.createElement('div');
+  _detailPanelEl.id = 'cosmos-detail-panel';
+  _detailPanelEl.style.cssText = 'position:absolute;top:0;right:0;width:0;height:100%;background:hsla(240,22%,8%,0.95);backdrop-filter:blur(16px);border-left:1px solid hsla(260,30%,40%,0.3);z-index:25;overflow-y:auto;transition:width 0.35s ease;color:#e0e0e0;font-family:"Noto Serif SC",serif;';
+  _detailPanelEl.innerHTML = '<div id="cosmos-detail-content" style="opacity:0;transition:opacity 0.2s 0.2s;padding:1.5rem;"></div>';
+  container.appendChild(_detailPanelEl);
+
+  _onClickFn = (event) => {
+    if (!raycaster || !camera || !scene) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const my = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
+    const clickables = [];
+    scene.traverse(obj => { if (obj.userData?.clickable && (obj.isMesh || obj.isPoints)) clickables.push(obj); });
+    const hits = raycaster.intersectObjects(clickables, false);
+
+    if (hits.length > 0) {
+      const data = hits[0].object.userData;
+      _detailPanel = data;
+      openDetailPanel(data);
+    } else {
+      _detailPanel = null;
+      closeDetailPanel();
+    }
+  };
+
+  function openDetailPanel(data) {
+    if (!_detailPanelEl) return;
+    _detailPanelEl.style.width = '280px';
+    const content = document.getElementById('cosmos-detail-content');
+    if (!content) return;
+    content.style.opacity = '1';
+    const typeNames = { sun: '认知核心', planet: '信念行星', satellite: '思维卫星' };
+    content.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:1.05rem;color:#4fc3f7;">${data.label || '未命名'}</h3>
+        <button id="cosmos-detail-close" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2rem;">&times;</button>
+      </div>
+      <div style="font-size:0.8rem;color:#aaa;margin-bottom:12px;">${typeNames[data.type] || data.type || '未知类型'}</div>
+      ${data.meta ? Object.entries(data.meta).map(([k, v]) => `<div style="margin-bottom:6px;"><span style="color:#888;font-size:0.75rem;">${k}:</span> <span style="font-size:0.8rem;">${typeof v === 'object' ? JSON.stringify(v).substring(0, 80) : v}</span></div>`).join('') : ''}
+    `;
+    document.getElementById('cosmos-detail-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _detailPanel = null;
+      closeDetailPanel();
+    });
+  }
+
+  function closeDetailPanel() {
+    if (!_detailPanelEl) return;
+    _detailPanelEl.style.width = '0';
+    const content = document.getElementById('cosmos-detail-content');
+    if (content) content.style.opacity = '0';
+  }
+
+  // ── B7: 双击聚焦 ──
+  _onDblClickFn = (event) => {
+    if (!raycaster || !camera || !scene) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const my = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
+    const clickables = [];
+    scene.traverse(obj => { if (obj.userData?.clickable && (obj.isMesh || obj.isPoints)) clickables.push(obj); });
+    const hits = raycaster.intersectObjects(clickables, false);
+
+    if (hits.length > 0) {
+      const obj = hits[0].object;
+      const pos = obj.getWorldPosition ? obj.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 0, 0);
+      flyToCosmosBody(pos, 5);
+    } else {
+      flyToCosmosBody(new THREE.Vector3(0, 30, 60), 30);
+    }
+  };
+
+  renderer.domElement.addEventListener('click', _onClickFn);
+  renderer.domElement.addEventListener('dblclick', _onDblClickFn);
+}
+
+function flyToCosmosBody(targetPos, distance = 5) {
+  if (!camera || !controls) return;
+  const T = THREE;
+  const startPos = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const endPos = new T.Vector3(targetPos.x + distance, targetPos.y + distance * 0.5, targetPos.z + distance);
+  let progress = 0;
+  const duration = 1.0;
+
+  _cameraTween = { t: 0, startPos, endPos, startTarget, targetEnd: targetPos.clone(), duration };
+
+  function step() {
+    if (!_cameraTween || !camera || !controls) return;
+    _cameraTween.t += 0.016;
+    const t = Math.min(1, _cameraTween.t / _cameraTween.duration);
+    const ease = t * (2 - t);
+    camera.position.lerpVectors(_cameraTween.startPos, _cameraTween.endPos, ease);
+    controls.target.lerpVectors(_cameraTween.startTarget, _cameraTween.targetEnd, ease);
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      _cameraTween = null;
+    }
+  }
+  step();
 }
 
 // ── 星空背景 ────────────────────────────────────────────

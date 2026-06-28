@@ -632,6 +632,12 @@ body {
   border-bottom-color: #4fc3f7 !important;
 }
 
+/* Evolution Timeline */
+.evo-marker { display:flex;flex-direction:column;align-items:center;cursor:pointer;padding:4px 8px;border-radius:6px;transition:background 0.2s; }
+.evo-marker:hover { background:hsla(260,30%,30%,0.3); }
+.evo-marker.key { background:hsla(200,40%,30%,0.15); }
+.evo-dot { border-radius:50%;display:block; }
+
 .detail-close {
   position: absolute;
   top: 1rem;
@@ -914,6 +920,17 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"/><polyline points="9,18 3,12 9,6"/></svg>
       <span class="ctrl-tooltip">返回</span>
     </button>
+    <div class="search-box" style="display:flex;align-items:center;gap:6px;">
+      <input id="search-input" type="text" placeholder="搜索天体..." style="width:160px;padding:6px 10px;background:hsla(240,20%,12%,0.9);border:1px solid hsla(260,30%,40%,0.3);border-radius:1.5rem;color:#e0e0e0;font-size:0.78rem;outline:none;">
+      <select id="search-type-filter" style="padding:6px 8px;background:hsla(240,20%,12%,0.9);border:1px solid hsla(260,30%,40%,0.3);border-radius:1.5rem;color:#e0e0e0;font-size:0.78rem;">
+        <option value="">全部类型</option>
+        <option value="giant_star">恒星</option>
+        <option value="planet_system">行星</option>
+        <option value="nebula">星云</option>
+        <option value="black_hole">暗物质</option>
+      </select>
+      <button id="btn-clear-search" style="padding:4px 8px;background:none;border:1px solid hsla(260,30%,40%,0.3);border-radius:1rem;color:#888;cursor:pointer;font-size:0.75rem;">x</button>
+    </div>
     <button class="ctrl-btn active" id="btn-play" title="暂停/播放">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6,4 20,12 6,20"/></svg>
       <span class="ctrl-tooltip">播放</span>
@@ -927,12 +944,24 @@ body {
       <span class="ctrl-tooltip">轨道</span>
     </button>
     <button class="ctrl-btn active" id="btn-labels" title="标签">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="8" rx="2"/><line x1="12" y1="11" x2="12" y2="21"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
       <span class="ctrl-tooltip">标签</span>
     </button>
     <button class="ctrl-btn" id="btn-reset" title="重置视角">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="12,6 12,14 16,10"/></svg>
-      <span class="ctrl-tooltip">重置</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/></svg>
+      <span class="ctrl-tooltip">重置视角</span>
+    </button>
+    <button class="ctrl-btn" id="btn-preset-core" title="核心聚焦">
+      <span class="ctrl-tooltip">核心聚焦</span>
+    </button>
+    <button class="ctrl-btn" id="btn-preset-side" title="侧视">
+      <span class="ctrl-tooltip">侧视</span>
+    </button>
+    <button class="ctrl-btn" id="btn-preset-top" title="上帝视角">
+      <span class="ctrl-tooltip">上帝视角</span>
+    </button>
+    <button class="ctrl-btn" id="btn-preset-fp" title="第一人物视角">
+      <span class="ctrl-tooltip">第一人称</span>
     </button>
     <button class="ctrl-btn" id="btn-export-image" title="导出截图">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -945,6 +974,10 @@ body {
     <button class="ctrl-btn" id="btn-settings" title="设置">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span class="ctrl-tooltip">设置</span>
+    </button>
+    <button class="ctrl-btn" id="btn-export-video" title="录制视频">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23,7 16,12 23,17 23,7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      <span class="ctrl-tooltip">视频</span>
     </button>
   </div>
 </div>
@@ -1049,6 +1082,15 @@ body {
         <span class="tc-time-label" id="tc-time-current">0.0s</span>
         <input type="range" class="tc-slider" id="time-slider" min="0" max="1000" value="0">
         <span class="tc-time-label" id="tc-time-total">10.0s</span>
+      </div>
+      <div class="evo-timeline" id="evolution-timeline">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:0.7rem;color:#aaa;">演化快照</span>
+          <button id="btn-load-evolution" style="padding:3px 12px;background:hsla(260,50%,40%,0.3);border:1px solid hsla(260,40%,50%,0.4);border-radius:1rem;color:#ccc;font-size:0.7rem;cursor:pointer;">加载</button>
+        </div>
+        <div id="evolution-markers" style="display:flex;gap:12px;overflow-x:auto;padding:8px 0;">
+          <span style="color:#666;font-size:0.75rem;">点击"加载"获取演化数据</span>
+        </div>
       </div>
     </div>
   </div>

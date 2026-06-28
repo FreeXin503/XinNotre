@@ -26,6 +26,8 @@ import growthRoutes from './growthTree.js';      // mixed prefix: /goal + /goals
 import spectrumRoutes from './thoughtSpectrum.js';
 import cosmosRoutes from './cosmos.js';
 import galaxyRoutes from './mindGalaxy.js';
+import { createShareToken, getSharedSnapshot } from '../controllers/shareController.js';
+import authMiddleware from '../middleware/auth.js';
 
 const router = Router();
 
@@ -47,6 +49,8 @@ router.use('/memoir', memoirRoutes);
 router.use('/thought-spectrum', spectrumRoutes);
 router.use('/cosmos', cosmosRoutes);
 router.use('/mind-galaxy', galaxyRoutes);
+router.post('/share', authMiddleware, createShareToken);
+router.get('/share/:token', getSharedSnapshot);
 
 // Sub-routers with mixed prefixes mount at root
 router.use('/', tagRoutes);
