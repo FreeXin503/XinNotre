@@ -93,18 +93,16 @@
 
 ## Git 状态
 
-最新提交：`9d8b165` — feat(mind-galaxy): batch 2 complete — B3-B8 + C10/C12/C17/C23
+最新提交：`8cfc4b5` — feat(mind-galaxy): batch 3 complete — C25 share posters + C26 report traceability
 
 ### 提交历史
 
 | Hash | 消息 |
 |------|------|
+| `8cfc4b5` | feat(mind-galaxy): batch 3 complete — C25 share posters + C26 report traceability |
+| `00cf757` | docs: mark batch 2 complete, next batch 3 (C25,C26) |
 | `9d8b165` | feat(mind-galaxy): batch 2 complete — B3-B8 + C10/C12/C17/C23 |
 | `79bf9ca` | docs: mark batch 1 complete, update PROGRESS.md milestone |
-| `8e2b88f` | feat(mind-galaxy): batch 1 complete — C29-C35 privacy/edit/config |
-| `aa21b15` | feat(config): add SESSION_CONSTITUTION.md with commit-at-checkpoint rules |
-| `ab50001` | feat(mind-galaxy): batch 1 complete — C19-C22 render + C9,C11,C24 export/import |
-| `915c654` | feat(mind-galaxy): 批1 first half — B1,B2,B5交互 + C13-C16,C27,C28 NLP |
 
 ---
 
@@ -114,6 +112,10 @@
 
 - **Phase 0 (A1-A10)**: ✅ 完成
 - **批1 (23 cards)**: ✅ 完成
-- **批2 (9 cards)**: ✅ 完成  
-- **批3 (2 cards)**: C25 分享模板, C26 报告点击溯源
+- **批2 (9 cards)**: ✅ 完成
+- **批3 (2 cards)**: ✅ 完成
 - **批4 (10 cards, 可选)**: D1-D10 远期扩展
+
+### 核心工程里程碑：44/44 ✅ 全部完成
+
+剩余 D1-D10 批4 为远期可选功能（导入/多人/数字孪生等），计划另行规划。
