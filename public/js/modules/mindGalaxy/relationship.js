@@ -1,7 +1,7 @@
 export async function loadRelationshipGalaxy(token, rs, celestialItems, buildGalaxy, initLabels) {
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await fetch(`/api/mind-galaxy/relationship/graph/${encodeURIComponent(token)}`);
     if (!res.ok) return null;
     const data = await res.json();

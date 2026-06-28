@@ -80,7 +80,7 @@ function exportImage(renderer, resolution = '1080p') {
 async function exportJson() {
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await client.exportGalaxy('json');
     if (!res?.success) {
       showToast('数据导出失败: ' + (res?.error || '未知错误'), true);

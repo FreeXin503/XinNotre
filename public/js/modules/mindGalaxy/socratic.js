@@ -70,7 +70,7 @@ async function startNewSession(topic) {
 
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await client.request('/mind-galaxy/socratic/start', {
       method: 'POST',
       body: JSON.stringify({ topic }),
@@ -106,7 +106,7 @@ async function sendReply(message) {
 
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await client.request('/mind-galaxy/socratic/step', {
       method: 'POST',
       body: JSON.stringify({ sessionId: currentSessionId, userUtterance: message }),

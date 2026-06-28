@@ -31,7 +31,7 @@ export function initUI() {
       showImportStatus('正在生成星系...');
       try {
         const { ApiClient } = await import('../../api.js');
-        const client = new ApiClient();
+        const client = ApiClient;
         const url = source === 'notes' ? '/mind-galaxy/from-notes' : source === 'kb' ? '/mind-galaxy/from-kb' : '/mind-galaxy/mixed';
         const res = await client.request(url, { headers: client.getHeaders() });
         if (res?.success) {
@@ -59,7 +59,7 @@ export function initUI() {
     showImportStatus('正在分析...');
     try {
       const { ApiClient } = await import('../../api.js');
-      const client = new ApiClient();
+      const client = ApiClient;
       client.subscribeMindGalaxyAnalyze({ text, source: 'notes' }, {
         onStatus: (stage) => {
           const stages = { preprocess: '预处理中...', 'basic-analyze': '基础分析中...', 'deep-analyze': 'AI深度分析中...', 'graph-build': '构建心智图谱...', 'galaxy-map': '生成星系...' };
@@ -118,7 +118,7 @@ export async function loadEvolutionTimeline() {
 
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await client.request('/mind-galaxy/evolution', { headers: client.getHeaders() });
     if (!res?.success || !res.data?.snapshots) throw new Error('无演化数据');
     const { setSnapshots, replaceWithSnapshot } = await import('./index.js');
@@ -458,7 +458,7 @@ async function renderPersonPanel(body) {
   let persons = [];
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await client.request('/mind-galaxy/person/list', { headers: client.getHeaders() });
     if (res?.success) persons = res.data.persons || [];
   } catch {}
@@ -495,7 +495,7 @@ async function renderPersonPanel(body) {
     }
     try {
       const { ApiClient } = await import('../../api.js');
-      const client = new ApiClient();
+      const client = ApiClient;
       const res = await client.request('/mind-galaxy/person/merge', {
         method: 'POST', body: JSON.stringify({ personIdA, personIdB }), headers: client.getHeaders()
       });
@@ -511,7 +511,7 @@ async function renderPersonPanel(body) {
       if (valEl) valEl.textContent = Math.round(intimacy * 100) + '%';
       try {
         const { ApiClient } = await import('../../api.js');
-        const client = new ApiClient();
+        const client = ApiClient;
         await client.request('/mind-galaxy/person/intimacy', {
           method: 'PUT', body: JSON.stringify({ personId, intimacy }), headers: client.getHeaders()
         });
@@ -624,7 +624,7 @@ async function renderReportPanel(body) {
 
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const snapshotRes = await client.request('/mind-galaxy/snapshot', { headers: client.getHeaders() });
     if (!snapshotRes?.success || !snapshotRes.data?.id) {
       body.innerHTML = '<p style="color:#e57373;">暂无星系快照，请先生成星系</p>';
@@ -704,7 +704,7 @@ async function renderReportPanel(body) {
         btn.textContent = '检验中...';
         try {
           const { ApiClient } = await import('../../api.js');
-          const client = new ApiClient();
+          const client = ApiClient;
           const res = await client.request('/mind-galaxy/belief-check', {
             method: 'POST',
             body: JSON.stringify({ beliefText: belief }),

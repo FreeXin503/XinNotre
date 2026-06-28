@@ -273,7 +273,7 @@ function bindDetailActions(bodyId) {
 async function updateBodyName(bodyId, newName) {
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await client.request('/mind-galaxy/body/rename', {
       method: 'PUT', body: JSON.stringify({ bodyId, newName }), headers: client.getHeaders()
     });
@@ -325,7 +325,7 @@ function showClassifyPopup(bodyId) {
     if (!select.value) return;
     try {
       const { ApiClient } = await import('../../api.js');
-      const client = new ApiClient();
+      const client = ApiClient;
       const res = await client.request('/mind-galaxy/body/classify', {
         method: 'POST', body: JSON.stringify({ noteId: bodyId, topicId: select.value }), headers: client.getHeaders()
       });

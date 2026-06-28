@@ -408,7 +408,7 @@ function boot() {
 async function tryLoadServer() {
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const res = await client.getGalaxySnapshot();
     if (!res?.success || !res.data?.snapshot_json) return;
     const snap = typeof res.data.snapshot_json === 'string' ? JSON.parse(res.data.snapshot_json) : res.data.snapshot_json;
@@ -553,7 +553,7 @@ export async function startGalaxyGuide(question) {
 
   try {
     const { ApiClient } = await import('../../api.js');
-    const client = new ApiClient();
+    const client = ApiClient;
     const token = client.getToken();
 
     const response = await fetch('/api/mind-galaxy/ai-guide', {
