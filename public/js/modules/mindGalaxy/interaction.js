@@ -50,6 +50,22 @@ export function disposeInteraction() {
   hoveredObj = selectedObj = null;
 }
 
+function getTypeLabel(type) {
+  const map = {
+    black_hole: '银心 · 核心自我',
+    giant_star: '巨星 · 核心价值观',
+    main_sequence: '主序星 · 人生主题',
+    planet_system: '行星系统 · 心智模式',
+    nebula: '星云 · 情绪场',
+    binary_companion: '伴星 · 重要他人',
+    asteroid_belt: '小行星带 · 记忆碎片',
+    dark_matter: '暗物质 · 潜意识',
+    supernova_remnant: '超新星遗迹 · 观念转变',
+    neutron_star: '中子星 · 固化伤痛'
+  };
+  return map[type] || '天体 · ' + (type || '未知');
+}
+
 function onMouseMove(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -77,16 +93,16 @@ function onMouseMove(event) {
     }
     const data = obj.userData;
     if (tooltip && data) {
-      tooltip.style.display = 'block';
-      tooltip.style.left = event.clientX + 15 + 'px';
-      tooltip.style.top = event.clientY + 15 + 'px';
+      tooltip.classList.add('visible');
+      tooltip.style.left = (event.clientX + 20) + 'px';
+      tooltip.style.top = (event.clientY - 40) + 'px';
       tooltip.querySelector('.tt-name').textContent = data.name || data.bodyName || '';
-      tooltip.querySelector('.tt-type').textContent = data.type || '';
+      tooltip.querySelector('.tt-type').textContent = getTypeLabel(data.type);
     }
   } else {
     resetHover();
     hoveredObj = null;
-    if (tooltip) tooltip.style.display = 'none';
+    if (tooltip) tooltip.classList.remove('visible');
   }
 }
 
@@ -143,6 +159,17 @@ function onKeyDown(event) {
       updateDetailPanel(null);
       break;
     case ' ':
+      event.preventDefault();
+      document.getElementById('btn-play')?.click();
+      break;
+    case 'r':
+      flyToPreset('coreFocus', 1.0);
+      break;
+    case 'o':
+      document.getElementById('btn-orbits')?.click();
+      break;
+    case 'l':
+      document.getElementById('btn-labels')?.click();
       break;
   }
 }

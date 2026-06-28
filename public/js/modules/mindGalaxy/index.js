@@ -511,6 +511,18 @@ export function unmountMindGalaxy() {
   bodyBaseStates.clear();
   orbitLines.forEach(line => { disposeOrbitLine(line); });
   orbitLines.length = 0;
+  _nebulaSprites.forEach(s => {
+    if (s.material?.map) s.material.map.dispose();
+    if (s.material) s.material.dispose();
+    if (s.parent) s.parent.remove(s);
+  });
+  _nebulaSprites = [];
+  if (_dustParticles) {
+    if (_dustParticles.geometry) _dustParticles.geometry.dispose();
+    if (_dustParticles.material) _dustParticles.material.dispose();
+    if (_dustParticles.parent) _dustParticles.parent.remove(_dustParticles);
+    _dustParticles = null;
+  }
   disposeSkybox(scene);
   disposeScene(scene, renderer, controls);
   scene = camera = renderer = controls = clock = rs = null;

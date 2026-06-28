@@ -15,31 +15,28 @@ export function initRenderer(container) {
   camera.position.set(8, 12, 22);
   camera.lookAt(0, 0, 0);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.9;
+  renderer.toneMappingExposure = 1.2;
   container.appendChild(renderer.domElement);
 
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.minDistance = 3;
-  controls.maxDistance = 120;
+  controls.minDistance = 4;
+  controls.maxDistance = 60;
   controls.maxPolarAngle = Math.PI * 0.85;
   controls.target.set(0, 0, 0);
   controls.update();
 
-  const ambientLight = new THREE.AmbientLight(0x223344, 0.6);
+  const ambientLight = new THREE.AmbientLight(0x1a1a3a, 0.6);
   scene.add(ambientLight);
-  const keyLight = new THREE.DirectionalLight(0xffeedd, 0.8);
-  keyLight.position.set(20, 30, 10);
+  const keyLight = new THREE.DirectionalLight(0x8899cc, 0.3);
+  keyLight.position.set(10, 20, 5);
   scene.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(0x334466, 0.4);
-  fillLight.position.set(-15, -5, -10);
-  scene.add(fillLight);
 
   const raycaster = new THREE.Raycaster();
   raycaster.params.Points.threshold = 0.3;
