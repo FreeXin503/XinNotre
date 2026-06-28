@@ -48,32 +48,31 @@ function exportImage(renderer, resolution = '1080p') {
   };
   const size = presets[resolution] || presets['1080p'];
 
-  const canvas = renderer.domElement;
+  const origW = renderer.domElement.width;
+  const origH = renderer.domElement.height;
+  const origPR = renderer.getPixelRatio();
 
   try {
-    if (canvas.toBlob) {
-      canvas.toBlob(blob => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.download = `mind-galaxy-${Date.now()}.png`;
-        link.href = url;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        showToast('截图已保存');
-      }, 'image/png');
-    } else {
-      const dataUrl = canvas.toDataURL('image/png');
+    renderer.setPixelRatio(1);
+    renderer.setSize(size.w, size.h, false);
+    if (typeof window.__mgRenderOnce === 'function') window.__mgRenderOnce();
+    const canvas = renderer.domElement;
+    canvas.toBlob(blob => {
+      renderer.setPixelRatio(origPR);
+      renderer.setSize(origW, origH, false);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = `mind-galaxy-${Date.now()}.png`;
-      link.href = dataUrl;
+      link.href = url;
       document.body.appendChild(link);
       link.click();
       link.remove();
+      URL.revokeObjectURL(url);
       showToast('截图已保存');
-    }
+    }, 'image/png');
   } catch (err) {
+    renderer.setPixelRatio(origPR);
+    renderer.setSize(origW, origH, false);
     showToast('截图导出失败: ' + err.message, true);
   }
 }
@@ -298,19 +297,23 @@ export function exportVideo(renderer, durationSec = 15, fps = 30) {
     link.remove();
     URL.revokeObjectURL(url);
     showToast('视频已导出');
+    const btn = document.getElementById('btn-export-video');
+    if (btn && btn.dataset.origHtml) { btn.innerHTML = btn.dataset.origHtml; delete btn.dataset.origHtml; btn.classList.remove('recording'); }
     _videoRecorder = null;
   };
 
   showToast(`开始录制 ${durationSec}s`);
 
   const recordBtn = document.getElementById('btn-export-video');
-  if (recordBtn) recordBtn.textContent = '停止';
+  if (recordBtn) {
+    recordBtn.dataset.origHtml = recordBtn.innerHTML;
+    recordBtn.classList.add('recording');
+  }
 
   _videoRecorder.start();
   setTimeout(() => {
     if (_videoRecorder?.state === 'recording') {
       _videoRecorder.stop();
-      if (recordBtn) recordBtn.textContent = '视频';
     }
   }, durationSec * 1000);
 }

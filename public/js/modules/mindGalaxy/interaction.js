@@ -6,6 +6,8 @@ let raycaster, mouse, camera, controls, scene;
 let hoveredObj = null, selectedObj = null;
 let _origEmissive = null;
 let cameraTween = null;
+let _clickablesCache = null;
+let _cacheFrame = 0;
 
 // ── CSS2D 标签系统 ──
 let labelRenderer = null;
@@ -44,6 +46,7 @@ export function disposeInteraction() {
   window.removeEventListener('keydown', onKeyDown);
   _searchListeners.forEach(({ el, type, fn }) => el.removeEventListener(type, fn));
   _searchListeners = [];
+  _clickablesCache = null;
   hoveredObj = selectedObj = null;
 }
 
@@ -54,9 +57,12 @@ function onMouseMove(event) {
   if (!raycaster || !camera) return;
   raycaster.setFromCamera(mouse, camera);
 
-  const clickables = [];
-  scene.traverse(obj => { if (obj.userData?.clickable) clickables.push(obj); });
-  const intersects = raycaster.intersectObjects(clickables, false);
+  if (!_clickablesCache || _cacheFrame++ > 30) {
+    _clickablesCache = [];
+    scene.traverse(obj => { if (obj.userData?.clickable) _clickablesCache.push(obj); });
+    _cacheFrame = 0;
+  }
+  const intersects = raycaster.intersectObjects(_clickablesCache, false);
 
   const tooltip = document.getElementById('tooltip');
   if (intersects.length > 0) {
@@ -119,7 +125,9 @@ function onDoubleClick(event) {
   const v = new window.THREE.Vector3(mx, my, 0.5);
   const ray = new window.THREE.Raycaster();
   ray.setFromCamera(v, camera);
-  const hits = ray.intersectObjects(scene.children, true);
+  const clickables = [];
+  scene.traverse(o => { if (o.userData?.clickable) clickables.push(o); });
+  const hits = ray.intersectObjects(clickables, false);
   if (!hits.length || hits[0].object.userData?.type === 'black_hole') return;
   selectedObj = hits[0].object;
   const pos = new window.THREE.Vector3();
@@ -135,7 +143,6 @@ function onKeyDown(event) {
       updateDetailPanel(null);
       break;
     case ' ':
-      event.preventDefault();
       break;
   }
 }

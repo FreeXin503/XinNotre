@@ -106,17 +106,18 @@ export function initPostProcessing(rs, params = {}) {
       fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float intensity; void main() { vec4 tex = texture2D(tDiffuse, vUv); float d = length(vUv - 0.5); tex.rgb *= 1.0 - d * intensity; gl_FragColor = tex; }'
     })
   );
-  vignettePass.enabled = false;
+  vignettePass.enabled = true;
+  vignettePass.uniforms.intensity.value = 0.25;
   composer.addPass(vignettePass);
 
   const grainPass = new ShaderPass(
     new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, intensity: { value: 0.02 } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, intensity: { value: 0.04 } },
       vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float time; uniform float intensity; float random(vec2 uv) { return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453); } void main() { vec4 tex = texture2D(tDiffuse, vUv); float grain = random(vUv + time) * intensity; tex.rgb += grain; gl_FragColor = tex; }'
     })
   );
-  grainPass.enabled = false;
+  grainPass.enabled = true;
   composer.addPass(grainPass);
 
   const dofPass = new ShaderPass(

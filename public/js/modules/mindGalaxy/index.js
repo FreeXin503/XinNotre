@@ -315,9 +315,15 @@ function animate() {
   renderLabels();
   if (controls) controls.update();
   const composer = rs?.getComposer();
-  if (composer) composer.render();
-  else if (renderer && scene && camera) renderer.render(scene, camera);
+  if (composer) { composer.render(); }
+  else if (renderer && scene && camera) { renderer.render(scene, camera); }
 }
+
+window.__mgRenderOnce = () => {
+  const c = rs?.getComposer();
+  if (c) c.render();
+  else if (renderer && scene && camera) renderer.render(scene, camera);
+};
 
 function boot() {
   const container = document.getElementById('canvas-container');
@@ -328,7 +334,7 @@ function boot() {
   controls = rs.controls; clock = rs.clock;
   window.__mgRenderer = renderer;
 
-  const pp = initPostProcessing(rs, { strength: 0.5, radius: 0.4, threshold: 0.0 });
+  const pp = initPostProcessing(rs, { strength: 0.7, radius: 0.5, threshold: 0.15 });
   renderer.__pp = pp;
 
   createSkybox(scene);

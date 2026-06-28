@@ -2,7 +2,7 @@
  * 心智星系 v2 · 天体工厂(1/2)
  * 职责：black_hole / giant_star / main_sequence / planet_system / nebula
  */
-import { generateGlowTexture, generateStarSurfaceTexture } from './textures.js';
+import { generateGlowTexture, generateStarSurfaceTexture, generateNebulaTexture, generateBlackHoleDiskTexture } from './textures.js';
 
 const THREE = () => window.THREE;
 
@@ -75,7 +75,8 @@ export function createBlackHole(body) {
       throw new Error('fallback');
     }
   } catch {
-    const diskMat = new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: T.DoubleSide });
+    const diskTex = generateBlackHoleDiskTexture();
+    const diskMat = new T.MeshBasicMaterial({ map: diskTex, transparent: true, opacity: 0.7, side: T.DoubleSide, blending: T.AdditiveBlending });
     disk = new T.Mesh(diskGeo, diskMat);
   }
   disk.rotation.x = Math.PI / 2;
@@ -186,9 +187,14 @@ export function createNebula(body) {
   const color = hexToColor(body.visual?.colorHex || '#6644AA');
   const motionSpeed = body.visual?.motionSpeed || 0.3;
 
+  const emotionColors = body.userData?.emotionMeta?.dominant_raw_emotions?.map(e => {
+    const map = { joy: '#FFD700', sadness: '#4169E1', anger: '#FF4500', fear: '#9400D3', surprise: '#00CED1', disgust: '#7CFC00', trust: '#FF69B4', anticipation: '#FFA500' };
+    return map[e];
+  }).filter(Boolean);
+  const nebulaTex = generateNebulaTexture(emotionColors && emotionColors.length > 0 ? emotionColors : null);
   const shellGeo = new T.SphereGeometry(radius, 32, 32);
   const shellMat = new T.MeshBasicMaterial({
-    color, transparent: true, opacity: density * 0.25, side: T.DoubleSide, depthWrite: false
+    map: nebulaTex, color, transparent: true, opacity: density * 0.35, side: T.DoubleSide, depthWrite: false
   });
   group.add(new T.Mesh(shellGeo, shellMat));
 

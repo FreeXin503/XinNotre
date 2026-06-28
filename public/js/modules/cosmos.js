@@ -9,6 +9,11 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { generateStarSurface, generateNebulaCloud, generateBlackHoleDisk, generateAtmosphereGlow, generateGalaxyBackground } from './cosmosTextures.js';
 import { ApiClient } from '../api.js';
 
 // ── 模块状态 ────────────────────────────────────────────
@@ -33,6 +38,8 @@ let _onDblClickFn = null;
 let _detailPanel = null;
 let _detailPanelEl = null;
 let _cameraTween = null;
+let composer = null;
+let skyboxMesh = null;
 
 // 3D 对象引用（用于动画和清理）
 let sunGroup = null;
@@ -86,6 +93,18 @@ export function unmountCosmos() {
     _tooltipEl.parentNode.removeChild(_tooltipEl);
   }
   _tooltipEl = null;
+
+  // 清理 skybox
+  if (skyboxMesh) {
+    scene?.remove(skyboxMesh);
+    if (skyboxMesh.geometry) skyboxMesh.geometry.dispose();
+    if (skyboxMesh.material) {
+      if (skyboxMesh.material.map) skyboxMesh.material.map.dispose();
+      skyboxMesh.material.dispose();
+    }
+    skyboxMesh = null;
+  }
+  composer = null;
 
   if (controls) { controls.dispose(); controls = null; }
   if (renderer) {
@@ -224,6 +243,7 @@ function initThreeScene(container) {
   const h = container.clientHeight || 500;
 
   scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x050510, 0.0002);
 
   camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 500);
   camera.position.set(0, 60, 100);
@@ -262,8 +282,29 @@ function initThreeScene(container) {
   backLight.position.set(-50, -30, -40);
   scene.add(backLight);
 
-  // 星空背景
+  // 星空背景 + 天球盒
   createStarField();
+  skyboxMesh = createSkybox();
+  if (skyboxMesh) scene.add(skyboxMesh);
+
+  // 后处理 EffectComposer
+  try {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.7, 0.5, 0.15);
+    composer.addPass(bloomPass);
+
+    const vignettePass = new ShaderPass(new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, intensity: { value: 0.25 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float intensity; void main(){ vec4 t=texture2D(tDiffuse,vUv); float d=length(vUv-0.5); t.rgb*=1.0-d*intensity; gl_FragColor=t; }'
+    }));
+    composer.addPass(vignettePass);
+  } catch (e) {
+    console.warn('[cosmos] EffectComposer not available, falling back:', e.message);
+    composer = null;
+  }
 
   // 动画循环
   renderer.setAnimationLoop(() => animate());
@@ -276,6 +317,7 @@ function initThreeScene(container) {
       camera.aspect = w2 / h2;
       camera.updateProjectionMatrix();
       renderer.setSize(w2, h2);
+      if (composer) composer.setSize(w2, h2);
     }
   };
   window.addEventListener('resize', onResize);
@@ -460,7 +502,7 @@ function flyToCosmosBody(targetPos, distance = 5) {
 // ── 星空背景 ────────────────────────────────────────────
 
 function createStarField() {
-  const starCount = 2000;
+  const starCount = 5000;
   const positions = new Float32Array(starCount * 3);
   const colors = new Float32Array(starCount * 3);
   for (let i = 0; i < starCount; i++) {
@@ -470,24 +512,41 @@ function createStarField() {
     positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = radius * Math.cos(phi);
     positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
-    const brightness = 0.3 + Math.random() * 0.7;
-    const tint = Math.random();
-    colors[i * 3] = brightness * (tint > 0.7 ? 0.8 : 1.0);
-    colors[i * 3 + 1] = brightness * (tint > 0.7 ? 0.6 : 1.0);
-    colors[i * 3 + 2] = brightness;
+    const hue = Math.random();
+    let r, g, b;
+    if (hue < 0.6) { r = 1; g = 1; b = 1; }
+    else if (hue < 0.85) { r = 0.63; g = 0.78; b = 1; }
+    else { r = 1; g = 0.89; b = 0.63; }
+    const bright = 0.5 + Math.random() * 0.5;
+    colors[i * 3] = r * bright;
+    colors[i * 3 + 1] = g * bright;
+    colors[i * 3 + 2] = b * bright;
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const material = new THREE.PointsMaterial({
-    size: 0.8,
+    size: 1.2,
     vertexColors: true,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.8,
     blending: THREE.AdditiveBlending
   });
   const stars = new THREE.Points(geometry, material);
   scene.add(stars);
+}
+
+function createSkybox() {
+  try {
+    const tex = generateGalaxyBackground();
+    const geo = new THREE.SphereGeometry(250, 32, 32);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
+    const mesh = new THREE.Mesh(geo, mat);
+    return mesh;
+  } catch (e) {
+    console.warn('[cosmos] Skybox creation failed:', e.message);
+    return null;
+  }
 }
 
 // ── 构建心智宇宙 ─────────────────────────────────────────
@@ -510,9 +569,9 @@ function buildCosmos(data) {
   planetGroups = [];
   satelliteGroups.forEach(g => { scene.remove(g); disposeGroup(g); });
   satelliteGroups = [];
-  nebulaPointsList.forEach(p => { scene.remove(p); p.geometry.dispose(); p.material.dispose(); });
+  nebulaPointsList.forEach(p => { scene.remove(p); disposeGroup(p); });
   nebulaPointsList = [];
-  clumpPointsList.forEach(p => { scene.remove(p); p.geometry.dispose(); p.material.dispose(); });
+  clumpPointsList.forEach(p => { scene.remove(p); disposeGroup(p); });
   clumpPointsList = [];
 
   const planetIdMap = new Map();
@@ -580,14 +639,17 @@ function createBlackHole(sunData) {
   const sphere = new THREE.Mesh(sphereGeo, sphereMat);
   group.add(sphere);
 
-  // 吸积盘 (torus)
+  // 吸积盘 (torus) 带哈勃写实风贴图
   if (sunData.physical_fields?.accretion_disk_active) {
+    const diskTex = generateBlackHoleDisk(sunData.material_properties.base_color);
     const torusGeo = new THREE.TorusGeometry(sunData.geometry.radius * 1.8, 0.6, 16, 64);
     const torusMat = new THREE.MeshBasicMaterial({
-      color: 0x8B5CF6,
+      map: diskTex,
       transparent: true,
-      opacity: 0.3,
-      side: THREE.DoubleSide
+      opacity: 0.4,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
     });
     const torus = new THREE.Mesh(torusGeo, torusMat);
     torus.rotation.x = Math.PI / 2.5;
@@ -595,10 +657,12 @@ function createBlackHole(sunData) {
 
     const torus2 = new THREE.TorusGeometry(sunData.geometry.radius * 2.2, 0.3, 8, 48);
     const torusMat2 = new THREE.MeshBasicMaterial({
-      color: 0x6D28D9,
+      map: diskTex,
       transparent: true,
-      opacity: 0.2,
-      side: THREE.DoubleSide
+      opacity: 0.25,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
     });
     const torus2Mesh = new THREE.Mesh(torus2, torusMat2);
     torus2Mesh.rotation.x = Math.PI / 2.5;
@@ -672,9 +736,11 @@ function createPlanet(planetData) {
   scene.add(orbitLine);
   group._orbitLine = orbitLine;
 
-  // 星球
+  // 星球（带哈勃写实风纹理）
   const sphereGeo = new THREE.SphereGeometry(p.visual_layer.radius, 24, 24);
+  const starTex = generateStarSurface(p.visual_layer.atmosphere_glow_color || '#4169E1', 1.2);
   const sphereMat = new THREE.MeshStandardMaterial({
+    map: starTex,
     color: new THREE.Color(p.visual_layer.atmosphere_glow_color || '#666666'),
     roughness: 0.6,
     metalness: 0.2,
@@ -684,15 +750,16 @@ function createPlanet(planetData) {
   const sphere = new THREE.Mesh(sphereGeo, sphereMat);
   group.add(sphere);
 
-  // 大气层发光
-  const glowGeo = new THREE.SphereGeometry(p.visual_layer.radius * 1.1, 24, 24);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(p.visual_layer.atmosphere_glow_color || '#666666'),
+  // 大气层发光（Sprite 辉光）
+  const glowTex = generateAtmosphereGlow(p.visual_layer.atmosphere_glow_color || '#4169E1', p.visual_layer.atmosphere_density || 0.5);
+  const glowMat = new THREE.SpriteMaterial({
+    map: glowTex,
     transparent: true,
-    opacity: 0.15 * (p.visual_layer.atmosphere_density || 0.5),
-    side: THREE.BackSide
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
   });
-  const glow = new THREE.Mesh(glowGeo, glowMat);
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.set(p.visual_layer.radius * 6, p.visual_layer.radius * 6, 1);
   group.add(glow);
 
   return group;
@@ -756,6 +823,17 @@ function createSatellite(satData, planetIdMap) {
 
 // ── 潜意识暗星云 ────────────────────────────────────────
 
+const EMOTION_COLOR_MAP = {
+  joy: '#FFD700',
+  sadness: '#4169E1',
+  anger: '#FF4500',
+  fear: '#9400D3',
+  surprise: '#00CED1',
+  disgust: '#7CFC00',
+  trust: '#FF69B4',
+  anticipation: '#FFA500'
+};
+
 function createNebula(nebData) {
   if (!nebData.particle_system) return null;
 
@@ -764,20 +842,41 @@ function createNebula(nebData) {
   const center = nebData.center_position || [0, 0, 0];
   const isDark = nebData.particle_system.is_dark_nebula;
 
+  const group = new THREE.Group();
+  group.position.set(center[0], center[1], center[2]);
+
+  // 内层星云辉光球壳（哈勃写实风纹理）
+  const shellEmotions = nebData.psychological_meta?.dominant_raw_emotions || [];
+  const shellColors = shellEmotions.map(e => EMOTION_COLOR_MAP[e]).filter(Boolean);
+  const nebulaTex = generateNebulaCloud(
+    shellColors.length > 0 ? shellColors : ['#FF6B35', '#F7931E', '#FFD700'],
+    isDark
+  );
+  const shellGeo = new THREE.SphereGeometry(boundR, 24, 24);
+  const shellMat = new THREE.MeshBasicMaterial({
+    map: nebulaTex,
+    transparent: true,
+    opacity: isDark ? 0.4 : 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const shell = new THREE.Mesh(shellGeo, shellMat);
+  group.add(shell);
+
+  // 粒子系统
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
 
   for (let i = 0; i < count; i++) {
-    // 用球体分布
     const radius = Math.random() * boundR;
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    positions[i * 3] = center[0] + radius * Math.sin(phi) * Math.cos(theta);
-    positions[i * 3 + 1] = center[1] + radius * Math.cos(phi) * 0.4;
-    positions[i * 3 + 2] = center[2] + radius * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = radius * Math.cos(phi) * 0.4;
+    positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
 
     if (isDark) {
-      // 吸光暗星云：低亮度、暗紫色
       colors[i * 3] = 0.05 + Math.random() * 0.1;
       colors[i * 3 + 1] = 0.01 + Math.random() * 0.05;
       colors[i * 3 + 2] = 0.05 + Math.random() * 0.15;
@@ -801,7 +900,10 @@ function createNebula(nebData) {
     depthWrite: false
   });
 
-  return new THREE.Points(geometry, material);
+  const points = new THREE.Points(geometry, material);
+  group.add(points);
+
+  return group;
 }
 
 // ── 拉格朗日欲望碎石带 ──────────────────────────────────
@@ -833,9 +935,10 @@ function createLagrangeClump(clumpData, planetIdMap) {
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
+  const clumpColor = clumpData.desire_tags?.[0] === 'POSSESSIVE' ? '#DC143C' : '#FFD700';
   const material = new THREE.PointsMaterial({
-    color: new THREE.Color('#FFD700'),
-    size: 0.08,
+    color: new THREE.Color(clumpColor),
+    size: 0.12,
     transparent: true,
     opacity: 0.6 + clumpData.particle_density * 0.3,
     blending: THREE.AdditiveBlending,
@@ -891,6 +994,9 @@ function animate() {
   });
 
   controls.update();
+
+  if (composer) composer.render();
+  else renderer.render(scene, camera);
 }
 
 // ── 图例 ────────────────────────────────────────────────
