@@ -1,41 +1,57 @@
-import express from 'express';
-import rateLimit from 'express-rate-limit';
-import { register, login } from '../controllers/authController.js';
-import { getNotes, getNoteDetail, createNote, updateNote, deleteNote } from '../controllers/noteController.js';
-import { syncPush } from '../controllers/syncController.js';
-import { chatStream } from '../controllers/aiController.js';
-import { getSkills } from '../controllers/skillController.js';
-import authMiddleware from '../middleware/auth.js';
+/**
+ * API 路由聚合器
+ * 子路由按域名拆分到各文件，此处统一挂载。
+ */
+import { Router } from 'express';
 
-const router = express.Router();
+import authRoutes from './auth.js';
+import noteRoutes from './notes.js';
+import syncRoutes from './sync.js';
+import aiRoutes from './ai.js';
+import skillRoutes from './skills.js';
+import reportRoutes from './report.js';
+import emotionRoutes from './emotion.js';
+import keyRoutes from './keys.js';
+import tagRoutes from './tags.js';       // mixed prefix: /tags + /notes/:noteId/tags
+import kbRoutes from './knowledgeBases.js';
+import archaeologyRoutes from './archaeology.js';
+import personaRoutes from './persona.js';
+import weatherRoutes from './emotionWeather.js';   // mixed prefix: /annotation + /weather
+import almanacRoutes from './almanac.js';
+import letterRoutes from './letter.js';          // mixed prefix: /letter + /letters
+import nightLetterRoutes from './nightLetter.js';
+import penpalRoutes from './penpal.js';
+import memoirRoutes from './memoir.js';
+import growthRoutes from './growthTree.js';      // mixed prefix: /goal + /goals
+import spectrumRoutes from './thoughtSpectrum.js';
+import cosmosRoutes from './cosmos.js';
+import galaxyRoutes from './mindGalaxy.js';
 
-// Rate limiting for auth routes (prevent brute force)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
-  message: { error: 'Too many attempts, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
+const router = Router();
 
-// Public auth routes
-router.post('/auth/register', authLimiter, register);
-router.post('/auth/login', authLimiter, login);
+router.use('/auth', authRoutes);
+router.use('/notes', noteRoutes);
+router.use('/sync', syncRoutes);
+router.use('/ai', aiRoutes);
+router.use('/skills', skillRoutes);
+router.use('/report', reportRoutes);
+router.use('/emotion', emotionRoutes);
+router.use('/keys', keyRoutes);
+router.use('/knowledge-bases', kbRoutes);
+router.use('/archaeology', archaeologyRoutes);
+router.use('/persona', personaRoutes);
+router.use('/almanac', almanacRoutes);
+router.use('/night-letters', nightLetterRoutes);
+router.use('/penpal', penpalRoutes);
+router.use('/memoir', memoirRoutes);
+router.use('/thought-spectrum', spectrumRoutes);
+router.use('/cosmos', cosmosRoutes);
+router.use('/mind-galaxy', galaxyRoutes);
 
-// Protected routes (require JWT auth)
-router.get('/notes', authMiddleware, getNotes);
-router.post('/notes', authMiddleware, createNote);
-router.get('/notes/:id', authMiddleware, getNoteDetail);
-router.put('/notes/:id', authMiddleware, updateNote);
-router.delete('/notes/:id', authMiddleware, deleteNote);
-
-// Userscript Cloud Sync route
-router.post('/sync/push', authMiddleware, syncPush);
-
-// SSE Streaming AI Dialog route
-router.post('/ai/chat', authMiddleware, chatStream);
-
-// Get parsed nvwo skills
-router.get('/skills', authMiddleware, getSkills);
+// Sub-routers with mixed prefixes mount at root
+router.use('/', tagRoutes);
+router.use('/', weatherRoutes);
+router.use('/', letterRoutes);
+router.use('/', growthRoutes);
 
 export default router;

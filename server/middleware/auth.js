@@ -1,11 +1,13 @@
 import jwt from 'jsonwebtoken';
+import { config } from '../config/index.js';
+import { fail } from '../utils/response.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = config.jwtSecret;
 
 export default function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Auth failed: Token missing or invalid structure' });
+    return fail(res, 'Auth failed: Token missing or invalid structure', 401);
   }
 
   const token = authHeader.split(' ')[1];
@@ -14,6 +16,6 @@ export default function authMiddleware(req, res, next) {
     req.user = { id: decoded.userId, username: decoded.username };
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Auth failed: Token is expired or invalid' });
+    return fail(res, 'Auth failed: Token is expired or invalid', 401);
   }
 }

@@ -1,164 +1,129 @@
-import { query } from '../config/database.js';
+/**
+ * 心迹星图 便签控制器
+ * 职责：HTTP 请求/响应处理，业务逻辑委托给 NoteRepository
+ *
+ * 优化说明：
+ * - 裸 SQL 已全部迁移至 server/repositories/noteRepository.js
+ * - 响应格式统一使用 server/utils/response.js
+ * - 异步错误由 asyncHandler 自动捕获
+ */
+import noteRepository from '../repositories/noteRepository.js';
+import { success, fail, paginated, asyncHandler } from '../utils/response.js';
+import { clampInt } from '../config/database.js';
 
-// Get list of notes with optional search, category filter, and pagination
-export async function getNotes(req, res) {
+/**
+ * GET /api/notes
+ * 分页获取便签列表（含分类统计、回收站计数）
+ */
+export const getNotes = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { category, search, limit = 50, offset = 0 } = req.query;
+  const { category, search } = req.query;
+  const page = clampInt(req.query.page, 1, 10000);
+  const pageSize = clampInt(req.query.pageSize, 1, 200);
 
-  try {
-    let sql = 'SELECT * FROM notes WHERE user_id = $1 AND is_deleted = FALSE';
-    const params = [userId];
+  const result = await noteRepository.findByUserId(userId, { category, search, page, pageSize });
 
-    if (category && category !== '全部') {
-      params.push(category);
-      sql += ` AND category = $${params.length}`;
-    }
+  res.json({
+    success: true,
+    data: {
+      items: result.items,
+      total: result.total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(result.total / pageSize) || 0
+    },
+    meta: {
+      categories: result.categories,
+      deletedCount: result.deletedCount
+    },
+    timestamp: new Date().toISOString()
+  });
+});
 
-    if (search) {
-      params.push(`%${search}%`);
-      sql += ` AND (title LIKE $${params.length} OR content LIKE $${params.length} OR category LIKE $${params.length})`;
-    }
+/**
+ * GET /api/notes/deleted
+ * 获取回收站便签列表
+ */
+export const getDeletedNotes = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const page = clampInt(req.query.page, 1, 10000);
+  const pageSize = clampInt(req.query.pageSize, 1, 200);
 
-    sql += ' ORDER BY updated_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(parseInt(limit), parseInt(offset));
+  const result = await noteRepository.findDeleted(userId, page, pageSize);
+  paginated(res, result.items, result.total, page, pageSize);
+});
 
-    const result = await query(sql, params);
-    
-    // Also fetch categories count/distribution for statistics
-    const statsResult = await query(
-      'SELECT category, COUNT(*) as count FROM notes WHERE user_id = $1 AND is_deleted = FALSE GROUP BY category',
-      [userId]
-    );
-
-    res.json({
-      notes: result.rows,
-      categories: statsResult.rows
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch notes: ' + err.message });
-  }
-}
-
-// Get specific note detail with history versions
-export async function getNoteDetail(req, res) {
+/**
+ * GET /api/notes/:id
+ * 获取便签详情（含版本历史）
+ */
+export const getNoteDetail = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
 
-  try {
-    const noteRes = await query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
-    if (noteRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Note not found' });
-    }
-
-    // Fetch versions
-    const versionsRes = await query(
-      'SELECT * FROM note_versions WHERE note_id = $1 ORDER BY version_num DESC',
-      [id]
-    );
-
-    res.json({
-      note: noteRes.rows[0],
-      versions: versionsRes.rows
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch note detail: ' + err.message });
+  const note = await noteRepository.findById(id, userId);
+  if (!note) {
+    return fail(res, 'Note not found', 404);
   }
-}
 
-// Create new note
-export async function createNote(req, res) {
+  const versions = await noteRepository.findVersions(id);
+  success(res, { note, versions });
+});
+
+/**
+ * POST /api/notes
+ * 创建新便签
+ */
+export const createNote = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  let { title = '无标题', content = '', category = '未分类' } = req.body;
-  const id = req.body.id || Math.random().toString(36).substring(2, 12);
-  title = String(title).substring(0, 500);
-  content = String(content).substring(0, 100000);
-  category = String(category).substring(0, 100);
-  const wordCount = content.length;
+  const { title = '无标题', content = '', category = '未分类', id: customId } = req.body;
 
-  try {
-    await query(
-      `INSERT INTO notes (id, user_id, title, content, category, word_count, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-      [id, userId, title, content, category, wordCount]
-    );
+  const note = await noteRepository.create({ title, content, category, id: customId }, userId);
+  success(res, note, 201);
+});
 
-    const noteRes = await query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
-    res.status(201).json(noteRes.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create note: ' + err.message });
-  }
-}
-
-// Update existing note with version snapshot
-export async function updateNote(req, res) {
+/**
+ * PUT /api/notes/:id
+ * 更新便签（自动创建版本快照）
+ */
+export const updateNote = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  let { title, content, category } = req.body;
-  if (title !== undefined) title = String(title).substring(0, 500);
-  if (content !== undefined) content = String(content).substring(0, 100000);
-  if (category !== undefined) category = String(category).substring(0, 100);
 
-  try {
-    // 1. Fetch current note to archive its current state
-    const currentRes = await query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
-    if (currentRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Note not found' });
-    }
+  const note = await noteRepository.update(id, req.body, userId);
+  success(res, note);
+});
 
-    const currentNote = currentRes.rows[0];
-
-    // If changes occurred, create a history version
-    if (currentNote.title !== title || currentNote.content !== content) {
-      // Find the next version number
-      const verCountRes = await query(
-        'SELECT COALESCE(MAX(version_num), 0) as max_ver FROM note_versions WHERE note_id = $1',
-        [id]
-      );
-      const nextVer = verCountRes.rows[0].max_ver + 1;
-
-      // Save version snapshot
-      await query(
-        `INSERT INTO note_versions (note_id, title, content, version_num, created_at)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [id, currentNote.title, currentNote.content, nextVer, currentNote.updated_at]
-      );
-    }
-
-    // 2. Perform the update
-    const wordCount = content !== undefined ? content.length : currentNote.word_count;
-    const finalTitle = title !== undefined ? title : currentNote.title;
-    const finalContent = content !== undefined ? content : currentNote.content;
-    const finalCategory = category !== undefined ? category : currentNote.category;
-
-    await query(
-      `UPDATE notes
-       SET title = $1, content = $2, category = $3, word_count = $4, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5 AND user_id = $6`,
-      [finalTitle, finalContent, finalCategory, wordCount, id, userId]
-    );
-
-    const noteRes = await query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
-    res.json(noteRes.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update note: ' + err.message });
-  }
-}
-
-// Delete note (Soft delete)
-export async function deleteNote(req, res) {
+/**
+ * DELETE /api/notes/:id?hard=false
+ * 删除便签（默认软删除到回收站）
+ */
+export const deleteNote = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
   const { hard = false } = req.query;
 
-  try {
-    if (hard === 'true' || hard === true) {
-      await query('DELETE FROM notes WHERE id = $1 AND user_id = $2', [id, userId]);
-      res.json({ message: 'Note permanently deleted' });
-    } else {
-      await query('UPDATE notes SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2', [id, userId]);
-      res.json({ message: 'Note soft-deleted successfully' });
-    }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete note: ' + err.message });
+  const deleted = hard === 'true' || hard === true
+    ? await noteRepository.hardDelete(id, userId)
+    : await noteRepository.softDelete(id, userId);
+
+  if (!deleted) {
+    return fail(res, 'Note not found', 404);
   }
-}
+  success(res, { message: hard ? 'Note permanently deleted' : 'Note soft-deleted successfully' });
+});
+
+/**
+ * POST /api/notes/:id/restore
+ * 从回收站恢复便签
+ */
+export const restoreNote = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const note = await noteRepository.restore(id, userId);
+  if (!note) {
+    return fail(res, 'Deleted note not found', 404);
+  }
+  success(res, note);
+});
