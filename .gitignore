@@ -11,8 +11,21 @@ server/.env
 notes_data.js
 oppo_notes_export_*.json
 payload.json
+*.log
+
+# Output directories
+outputs/
 
 # System / IDE files
 .DS_Store
 .vscode/
 .idea/
+
+# Temp / generated files
+scratch/
+
+# opencode
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode/.gitignore

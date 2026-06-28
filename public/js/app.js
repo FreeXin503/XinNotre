@@ -1,4 +1,36 @@
 ﻿import { ApiClient } from './api.js';
+import { mountLengthModeSelector } from './components/lengthModeSelector.js';
+
+// ── 新架构模块导入 ──────────────────────────────────────
+import { store } from './core/state.js';
+import {
+  fetchNotes as svcFetchNotes,
+  fetchNoteDetail as svcFetchNoteDetail,
+  createNote as svcCreateNote,
+  updateNote as svcUpdateNote,
+  deleteNote as svcDeleteNote,
+  restoreNote as svcRestoreNote
+} from './services/noteService.js';
+import { login as svcLogin, register as svcRegister, logout as svcLogout, isLoggedIn } from './services/authService.js';
+import { syncLocalToCloud as svcSyncLocalToCloud } from './services/syncService.js';
+import { getAllSessions, saveSession, deleteSession as svcDeleteSession, autoArchive as svcAutoArchive } from './services/chatHistoryService.js';
+import { initAtMention } from './components/atMention.js';
+import { renderTimelineHeatmap, setupTimelineControls, setTimelineGroupMode, getTimelineFilter, setTimelineFilter } from './components/timelineHeatmap.js';
+
+// ── 兼容转发层：旧 window 全局函数 → 新模块 ────────────
+// 保持与 index.html inline onclick 调用的兼容
+window.store = store;
+
+// 流式输出渲染节流器：避免每个 token 都触发 marked.parse 与 DOM 重排
+function scheduleMarkdownRender(element, text, delay = 80) {
+  if (!element) return;
+  if (element._renderTimeout) return;
+  element._renderTimeout = setTimeout(() => {
+    element._renderTimeout = null;
+    element.innerHTML = marked.parse(text);
+  }, delay);
+}
+window.scheduleMarkdownRender = scheduleMarkdownRender;
 
 // 覆盖 inline 的预设卡片发送，改用流式路径
 window.sendAiPreset = async function(presetText) {
@@ -159,12 +191,12 @@ function setupFullstackUI() {
 
   function toggleAuthMode(registerMode) {
     if (registerMode) {
-      authTitle.textContent = '创建 XinNote 账户';
+      authTitle.textContent = '创建 心迹星图 账户';
       authSubtitle.textContent = '开启您的全栈智能笔记之旅';
       btnSubmit.textContent = '立即注册';
       btnToggle.parentElement.innerHTML = '已有账号？ <span id="btn-auth-toggle">立即登录</span>';
     } else {
-      authTitle.textContent = 'XinNote 智能云空间';
+      authTitle.textContent = '心迹星图 智能云空间';
       authSubtitle.textContent = '全栈升级 v5.0 • 灵感无处不在';
       btnSubmit.textContent = '立即登录';
       btnToggle.parentElement.innerHTML = '还没有账号？ <span id="btn-auth-toggle">立即注册</span>';
@@ -331,6 +363,11 @@ function setupFullstackUI() {
 
   if (btnCloseDevSquad) btnCloseDevSquad.addEventListener('click', hideDevSquad);
   if (btnCloseDevSquadAction) btnCloseDevSquadAction.addEventListener('click', hideDevSquad);
+
+  // Mount length mode selectors
+  mountLengthModeSelector('length-mode-chat');
+  mountLengthModeSelector('length-mode-report');
+  mountLengthModeSelector('length-mode-emotion');
 }
 
 async function checkAuthAndInit() {
@@ -520,10 +557,8 @@ async function checkAuthAndInit() {
 }
 
 function handleLogout() {
-  if (confirm('确认要安全退出当前智能云账户吗？')) {
-    ApiClient.clearToken();
-    location.reload();
-  }
+  svcLogout();
+  location.reload();
 }
 
 // 核心数据库加载引擎：拉取全栈云端数据并无损适配原生可视化面板
@@ -535,15 +570,14 @@ async function loadNotesFromDB() {
   }
 
   try {
-    // 【已修复修正】对接 index.html 原生搜索框的真正 ID: 'search-input'
     const searchQuery = document.getElementById('search-input')?.value || '';
-    
-    const data = await ApiClient.getNotes({
+    const data = await svcFetchNotes({
       category: activeCategoryName === '全部便签' ? '' : activeCategoryName,
       search: searchQuery
     });
     
-    window.rawNotes = data.notes.map(note => ({
+    const notesData = data.items || data.notes || [];
+    window.rawNotes = notesData.map(note => ({
       id: note.id,
       title: note.title || '无标题',
       content: note.content || '',
@@ -608,7 +642,7 @@ function updateDeletedCountBadge(count) {
 async function loadDeletedNotes() {
   try {
     const data = await ApiClient.getDeletedNotes();
-    deletedNotesCache = data.notes || [];
+    deletedNotesCache = (data.data && data.data.items) || data.items || data.notes || [];
     updateDeletedCountBadge(deletedNotesCache.length);
     renderTrashDrawer();
   } catch (err) {
@@ -635,7 +669,8 @@ function renderSyncHistoryPanel() {
 
   panel = document.createElement('div');
   panel.id = 'sync-history-panel';
-  panel.style.cssText = 'margin-top:16px; padding:16px; border:1px solid var(--border-color); border-radius:16px; background: rgba(255,255,255,0.02);';
+  panel.className = 'x-panel-glass';
+  panel.style.marginTop = '16px';
 
   const items = syncHistoryCache.length > 0
     ? syncHistoryCache.map(item => {
@@ -680,7 +715,9 @@ function renderTrashDrawer() {
 
   drawer = document.createElement('div');
   drawer.id = 'trash-drawer';
-  drawer.style.cssText = 'width:100%; margin-top:20px; padding:16px; border:1px solid var(--border-color); border-radius:16px; background: rgba(255,255,255,0.02);';
+  drawer.className = 'x-panel-glass';
+  drawer.style.width = '100%';
+  drawer.style.marginTop = '20px';
 
   const items = deletedNotesCache.length > 0
     ? deletedNotesCache.map(note => {
@@ -720,19 +757,17 @@ function renderTrashDrawer() {
 }
 
 // 新建便签交互控制
-async function handleCreateNote() {
-  const title = prompt('请输入新建全栈云便签的标题:', '未命名灵感便签');
+async function handleCreateNote(prefillTitle, prefillContent) {
+  const title = prefillTitle ? prefillTitle.trim() : prompt('请输入新建全栈云便签的标题:', '未命名灵感便签');
   if (title === null) return;
-  
+
   try {
-    const newNote = await ApiClient.createNote({
+    const newNote = await svcCreateNote({
       title: title.trim() || '无标题',
-      content: '',
+      content: prefillContent || '',
       category: activeCategoryName === '全部便签' ? '未分类' : activeCategoryName
     });
-    
-    await loadNotesFromDB();
-    
+
     const mappedNote = (window.rawNotes || []).find(n => n.id === newNote.id);
     if (mappedNote && typeof window.selectNote === 'function') {
       window.selectNote(mappedNote);
@@ -741,6 +776,8 @@ async function handleCreateNote() {
     alert('创建便签失败: ' + err.message);
   }
 }
+
+window.handleCreateNote = handleCreateNote;
 
 // 编辑模式状态机控制
 function enterEditMode() {
@@ -768,17 +805,15 @@ function exitEditMode() {
 
 async function saveNoteEdits() {
   if (!currentSelectedNote) return;
-  
+
   const title = document.getElementById('edit-title').value.trim() || '无标题';
   const category = document.getElementById('edit-category').value.trim() || '未分类';
   const content = document.getElementById('edit-content').value;
 
   try {
-    const updated = await ApiClient.updateNote(currentSelectedNote.id, { title, category, content });
-    
-    await loadNotesFromDB();
+    const updated = await svcUpdateNote(currentSelectedNote.id, { title, category, content });
     exitEditMode();
-    
+
     const mappedNote = (window.rawNotes || []).find(n => n.id === updated.id);
     if (mappedNote && typeof window.selectNote === 'function') {
       window.selectNote(mappedNote);
@@ -793,12 +828,10 @@ async function handleDeleteNote() {
   if (!confirm(`您确定要把云端便签《${currentSelectedNote.title}》移入回收站吗？之后可恢复。`)) return;
 
   try {
-    await ApiClient.deleteNote(currentSelectedNote.id);
+    await svcDeleteNote(currentSelectedNote.id);
     currentSelectedNote = null;
     window.currentSelectedNote = null;
-    await loadNotesFromDB();
-    await loadDeletedNotes();
-    
+
     document.getElementById('reader-view').style.display = 'none';
     document.getElementById('dashboard-view').style.display = 'flex';
   } catch (err) {
@@ -820,9 +853,9 @@ window.selectNote = async function(note) {
     originalSelectNote(note);
   }
 
-  // 异步秒级获取版本控制快照
+  // 通过 noteService 获取版本历史
   try {
-    const detail = await ApiClient.getNoteDetail(note.id);
+    const detail = await svcFetchNoteDetail(note.id);
     renderVersionHistory(detail.versions);
   } catch (err) {
     console.error('拉取历史版本失败:', err.message);
@@ -840,8 +873,8 @@ function renderVersionHistory(versions) {
 
   box = document.createElement('div');
   box.id = 'version-history-box';
-  box.className = 'version-history-box';
-  box.style.cssText = `margin-top: 40px; padding: 20px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 14px;`;
+  box.className = 'version-history-box x-panel-glass-sm';
+  box.style.marginTop = '40px';
   
   let listHtml = '';
   versions.forEach(v => {
@@ -874,11 +907,12 @@ function renderVersionHistory(versions) {
 
       if (confirm(`确认要将当前便签快照无损回滚至历史版本 v${ver} 吗？`)) {
         try {
-          const updated = await ApiClient.updateNote(currentSelectedNote.id, {
+          const res = await ApiClient.updateNote(currentSelectedNote.id, {
             title,
             content,
             category: currentSelectedNote.category
           });
+          const updated = res.data || res;
           await loadNotesFromDB();
           const mappedNote = (window.rawNotes || []).find(n => n.id === updated.id);
           if (mappedNote && typeof window.selectNote === 'function') {
@@ -1064,7 +1098,7 @@ async function handleStreamingSend() {
         const thinkingContainer = aiBubble.querySelector('.thinking-container');
 
         const bubbleHeader = document.createElement('div');
-        bubbleHeader.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--primary); margin-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.04); padding-bottom:4px;';
+        bubbleHeader.className = 'x-bubble-header';
         bubbleHeader.innerHTML = `${perspective.avatarSvg || '🧠'} <span>${perspective.senderName} (${perspective.icon})</span>`;
         aiBubble.insertBefore(bubbleHeader, aiBubble.firstChild);
 
@@ -1078,7 +1112,8 @@ async function handleStreamingSend() {
           contextMode,
           currentNoteId: currentSelectedNote?.id,
           currentCategory: activeCategoryName,
-          systemInstruction: personaSystemInstruction
+          systemInstruction: personaSystemInstruction,
+          lengthMode: ApiClient.getLengthMode()
         };
 
         let fullContent = '';
@@ -1092,13 +1127,13 @@ async function handleStreamingSend() {
             if (chunk.reasoning) {
               if (thinkingContainer) thinkingContainer.style.display = 'block';
               fullReasoning += chunk.reasoning;
-              if (thinkingArea) thinkingArea.innerHTML = marked.parse(fullReasoning);
+              scheduleMarkdownRender(thinkingArea, fullReasoning);
             }
             if (chunk.content) {
               const loading = contentArea.querySelector('.typing-loading');
               if (loading) loading.remove();
               fullContent += chunk.content;
-              contentArea.innerHTML = marked.parse(fullContent);
+              scheduleMarkdownRender(contentArea, fullContent);
             }
             aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
           },
@@ -1158,7 +1193,8 @@ async function handleStreamingSend() {
           contextMode,
           currentNoteId: currentSelectedNote?.id,
           currentCategory: activeCategoryName,
-          systemInstruction: personaSystemInstruction
+          systemInstruction: personaSystemInstruction,
+          lengthMode: ApiClient.getLengthMode()
         };
 
         let fullContent = '';
@@ -1242,7 +1278,7 @@ async function handleStreamingSend() {
         const thinkingContainer = aiBubble.querySelector('.thinking-container');
 
         const bubbleHeader = document.createElement('div');
-        bubbleHeader.style.cssText = 'display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--primary); margin-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.04); padding-bottom:4px;';
+        bubbleHeader.className = 'x-bubble-header';
         bubbleHeader.innerHTML = `${perspective.avatarSvg || '🧠'} <span>${perspective.senderName} (${perspective.icon}) — 第 ${window.rotateCurrentIndex + 1}/${window.rotateQueue.length} 位</span>`;
         aiBubble.insertBefore(bubbleHeader, aiBubble.firstChild);
 
@@ -1256,7 +1292,8 @@ async function handleStreamingSend() {
           contextMode,
           currentNoteId: currentSelectedNote?.id,
           currentCategory: activeCategoryName,
-          systemInstruction: personaSystemInstruction
+          systemInstruction: personaSystemInstruction,
+          lengthMode: ApiClient.getLengthMode()
         };
 
         let fullContent = '';
@@ -1269,13 +1306,13 @@ async function handleStreamingSend() {
             if (chunk.reasoning) {
               if (thinkingContainer) thinkingContainer.style.display = 'block';
               fullReasoning += chunk.reasoning;
-              if (thinkingArea) thinkingArea.innerHTML = marked.parse(fullReasoning);
+              scheduleMarkdownRender(thinkingArea, fullReasoning);
             }
             if (chunk.content) {
               const loading = contentArea.querySelector('.typing-loading');
               if (loading) loading.remove();
               fullContent += chunk.content;
-              contentArea.innerHTML = marked.parse(fullContent);
+              scheduleMarkdownRender(contentArea, fullContent);
             }
             aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
           },
@@ -1320,7 +1357,8 @@ async function handleStreamingSend() {
       contextMode,
       currentNoteId: currentSelectedNote?.id,
       currentCategory: activeCategoryName,
-      ...(personaSystemInstruction && { systemInstruction: personaSystemInstruction })
+      ...(personaSystemInstruction && { systemInstruction: personaSystemInstruction }),
+      lengthMode: ApiClient.getLengthMode()
     };
 
     let fullContent = '';
@@ -1404,8 +1442,7 @@ function appendDynamicFollowUpSuggestions() {
 
   options.forEach(opt => {
     const card = document.createElement('div');
-    card.className = 'ai-preset-card';
-    card.style.cssText = 'flex:1; min-width:200px; padding:10px 14px; background:rgba(138,180,248,0.03); border:1px solid rgba(138,180,248,0.1); border-radius:12px; cursor:pointer; font-size:12px; transition:all 0.2s;';
+    card.className = 'ai-preset-card x-suggestion-card';
     card.innerHTML = `
       <div style="font-weight:600; color:var(--primary); margin-bottom:2px;">${opt.icon || '✨'} ${opt.title || '延伸探讨'}</div>
       <div style="color:var(--text-muted); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${opt.question || opt.desc}</div>
@@ -1429,6 +1466,10 @@ function appendChatBubble(role, content, displayHtml) {
   const isAi = role === 'ai';
   const bubble = document.createElement('div');
   bubble.className = `chat-bubble ${role}`;
+  
+  // 气泡入场延迟级联
+  const bubbleCount = aiChatMessages.querySelectorAll('.chat-bubble').length;
+  bubble.style.animationDelay = `${Math.min(bubbleCount * 0.035, 0.35)}s`;
   
   const username = ApiClient.getUsername() || 'HP';
   const p = (typeof getCurrentPerspective === 'function') ? getCurrentPerspective() : null;
@@ -1490,7 +1531,32 @@ window.selectFileCategory = function(fileId, catName) {
   window.activeFileId = fileId;
   window.activeCategoryName = catName;
 
-  loadNotesFromDB();
+  // 云端数据库文件：走数据库刷新
+  if (fileId === 'db-notes') {
+    loadNotesFromDB();
+    return;
+  }
+
+  // 本地备份文件：直接渲染对应分类
+  const file = (window.importedFiles || []).find(f => f.id === fileId);
+  if (!file) return;
+
+  const notes = file.categories[catName] || [];
+
+  // 展开便签面板
+  if (typeof window.toggleNotesPanel === 'function') {
+    window.toggleNotesPanel(false);
+  }
+
+  // 同步分类树高亮
+  if (typeof window.renderCategoriesTree === 'function') {
+    window.renderCategoriesTree();
+  }
+
+  // 渲染便签列表
+  if (typeof window.renderNotesList === 'function') {
+    window.renderNotesList(notes);
+  }
 };
 
 function debounce(func, wait) {
@@ -1618,8 +1684,8 @@ async function syncLocalToCloud() {
         btn.innerText = '⏳ 正在极速进行云端同步持久化...';
       }
 
-      const res = await ApiClient.syncPush(allNotes);
-      alert(`🎉 恭喜！云端同步成功！\n✨ 新增导入: ${res.stats.inserted} 篇\n📝 版本更新: ${res.stats.updated} 篇\n✅ 智能去重略过: ${res.stats.skipped} 篇`);
+      const res = await svcSyncLocalToCloud(allNotes);
+      alert(`🎉 恭喜！云端同步成功！\n✨ 新增导入: ${res.inserted} 篇\n📝 版本更新: ${res.updated} 篇\n✅ 智能去重略过: ${res.skipped} 篇`);
       
       // Switch to cloud DB space and reload
       activeFileId = 'db-notes';
@@ -2468,8 +2534,7 @@ window.makeTablesSortable = function(container) {
   container.querySelectorAll('table').forEach(table => {
     if (!table.parentElement.classList.contains('table-scroll-wrapper')) {
       const wrapper = document.createElement('div');
-      wrapper.className = 'table-scroll-wrapper';
-      wrapper.style.cssText = 'overflow-x: auto; max-width: 100%; border: 1px solid var(--border-color); border-radius: 12px; margin: 16px 0; background: rgba(255,255,255,0.01);';
+      wrapper.className = 'table-scroll-wrapper x-table-wrapper';
       table.parentNode.insertBefore(wrapper, table);
       wrapper.appendChild(table);
       
@@ -2748,62 +2813,20 @@ window.initIndexedDB = function() {
 };
 
 window.saveChatSessionToDB = async function(session) {
-  if (!dbInstance) await window.initIndexedDB();
-  return new Promise((resolve, reject) => {
-    const transaction = dbInstance.transaction(['chat_history'], 'readwrite');
-    const store = transaction.objectStore('chat_history');
-    const request = store.put(session);
-    request.onsuccess = () => resolve();
-    request.onerror = (e) => reject(e);
-  });
+  return saveSession(session);
 };
 
 window.deleteChatSessionFromDB = async function(id) {
-  if (!dbInstance) await window.initIndexedDB();
-  return new Promise((resolve, reject) => {
-    const transaction = dbInstance.transaction(['chat_history'], 'readwrite');
-    const store = transaction.objectStore('chat_history');
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = (e) => reject(e);
-  });
+  return svcDeleteSession(id);
 };
 
 window.getChatHistoryFromDB = async function() {
-  if (!dbInstance) await window.initIndexedDB();
-  return new Promise((resolve, reject) => {
-    const transaction = dbInstance.transaction(['chat_history'], 'readonly');
-    const store = transaction.objectStore('chat_history');
-    const request = store.getAll();
-    request.onsuccess = (e) => resolve(e.target.result || []);
-    request.onerror = (e) => reject(e);
-  });
+  return getAllSessions();
 };
 
 window.autoArchiveCurrentChat = async function() {
-  if (!window.aiMessageHistory || window.aiMessageHistory.length <= 1) return;
-  
-  const firstUserMsg = window.aiMessageHistory.find(m => m.role === 'user');
-  const title = firstUserMsg ? firstUserMsg.content.substring(0, 30) + (firstUserMsg.content.length > 30 ? '...' : '') : '未命名对话';
-  
-  if (!window.currentChatSessionId) {
-    window.currentChatSessionId = 'session_' + Date.now();
-  }
-  
-  const session = {
-    id: window.currentChatSessionId,
-    title: title,
-    noteId: window.currentSelectedNote ? window.currentSelectedNote.id : null,
-    messages: JSON.parse(JSON.stringify(window.aiMessageHistory)),
-    updatedAt: Date.now()
-  };
-  
-  try {
-    await window.saveChatSessionToDB(session);
-    window.renderChatHistoryList();
-  } catch (e) {
-    console.error('Failed to auto-archive chat:', e);
-  }
+  await svcAutoArchive();
+  window.renderChatHistoryList();
 };
 
 window.renderChatHistoryList = async function() {
@@ -3039,11 +3062,12 @@ window.handleOcrImageUpload = async function(event) {
       const separator = '\n\n---\n📷 **OCR 识别结果**：\n';
       const updatedContent = (window.currentSelectedNote.content || '') + separator + text;
       
-      const updated = await ApiClient.updateNote(window.currentSelectedNote.id, {
+      const res = await ApiClient.updateNote(window.currentSelectedNote.id, {
         title: window.currentSelectedNote.title,
         category: window.currentSelectedNote.category,
         content: updatedContent
       });
+      const updated = res.data || res;
       
       await loadNotesFromDB();
       const mappedNote = (window.rawNotes || []).find(n => n.id === updated.id);
