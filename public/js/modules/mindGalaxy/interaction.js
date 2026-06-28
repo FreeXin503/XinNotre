@@ -1,11 +1,18 @@
 /**
  * 心智星系 v2 · 交互系统
- * 职责：Raycaster hover/click/dblclick + 相机平滑跟随
+ * 职责：Raycaster hover/click/dblclick + 相机平滑跟随 + CSS2D 标签
  */
 let raycaster, mouse, camera, controls, scene;
 let hoveredObj = null, selectedObj = null;
 let _origEmissive = null;
 let cameraTween = null;
+
+// ── CSS2D 标签系统 ──
+let labelRenderer = null;
+let labelObjects = [];
+let labelsVisible = true;
+let _scene = null;
+let _camera = null;
 
 export function initInteraction(rs) {
   raycaster = rs.raycaster;
@@ -166,4 +173,94 @@ function updateDetailPanel(data) {
       </div>
     `;
   }
+}
+
+// ── CSS2D 标签系统 ──
+
+export function initLabels(rs, celestialItems) {
+  const T = window.THREE;
+  if (!T || !T.CSS2DRenderer || !rs) return;
+
+  _scene = rs.scene;
+  _camera = rs.camera;
+
+  labelRenderer = new T.CSS2DRenderer();
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.domElement.style.position = 'absolute';
+  labelRenderer.domElement.style.top = '0';
+  labelRenderer.domElement.style.left = '0';
+  labelRenderer.domElement.style.pointerEvents = 'none';
+  labelRenderer.domElement.style.zIndex = '2';
+  const container = document.getElementById('canvas-container');
+  if (container) {
+    container.appendChild(labelRenderer.domElement);
+  } else {
+    document.body.appendChild(labelRenderer.domElement);
+  }
+
+  function onLabelResize() {
+    if (labelRenderer) {
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  }
+  window.addEventListener('resize', onLabelResize, { passive: true });
+  labelRenderer.__resizeFn = onLabelResize;
+
+  for (const item of celestialItems) {
+    if (!item?.body?.name) continue;
+    const div = document.createElement('div');
+    div.className = item.body.type === 'planet_system' ? 'celestial-label planet-label' : 'celestial-label';
+    div.textContent = item.body.name;
+
+    const label = new T.CSS2DObject(div);
+    const radius = item.body.visual?.radius || 1;
+    const yOffset = item.body.type === 'planet_system' ? radius * 2.2 : radius * 1.8;
+    label.position.set(0, yOffset, 0);
+    label.userData.bodyId = item.body.id;
+    label.userData.radius = radius;
+    if (!labelsVisible) {
+      label.visible = false;
+    }
+
+    item.group.add(label);
+    labelObjects.push(label);
+  }
+}
+
+export function renderLabels() {
+  if (labelRenderer && _scene && _camera) {
+    labelRenderer.render(_scene, _camera);
+  }
+}
+
+export function disposeLabels() {
+  if (labelRenderer?.__resizeFn) {
+    window.removeEventListener('resize', labelRenderer.__resizeFn);
+  }
+  labelObjects.forEach(label => {
+    if (label.element?.parentNode) {
+      label.element.parentNode.removeChild(label.element);
+    }
+    if (label.parent) {
+      label.parent.remove(label);
+    }
+  });
+  labelObjects.length = 0;
+  if (labelRenderer?.domElement?.parentNode) {
+    labelRenderer.domElement.parentNode.removeChild(labelRenderer.domElement);
+  }
+  labelRenderer = null;
+  _scene = null;
+  _camera = null;
+}
+
+export function setLabelsVisible(visible) {
+  labelsVisible = visible;
+  labelObjects.forEach(label => { label.visible = visible; });
+}
+
+export function toggleLabels() {
+  labelsVisible = !labelsVisible;
+  labelObjects.forEach(label => { label.visible = labelsVisible; });
+  return labelsVisible;
 }

@@ -1,16 +1,19 @@
 /**
  * 心智星系 v2 · 主模块
  */
-import { initRenderer, disposeScene } from './renderer.js';
+import { initRenderer, initPostProcessing, disposePostProcessing, disposeScene, createOrbitLine, disposeOrbitLine, createSkybox, disposeSkybox } from './renderer.js';
 import { createBlackHole, createGiantStar, createMainSequence, createPlanetSystem, createNebula } from './celestialBodies.js';
 import { createBinaryCompanion, createAsteroidBelt, createDarkMatter, createSupernovaRemnant, createNeutronStar } from './celestialBodies2.js';
 import { spiralPosition } from './layout.js';
-import { initInteraction, updateInteraction, disposeInteraction } from './interaction.js';
-import { initUI } from './uiPanels.js';
+import { initInteraction, updateInteraction, disposeInteraction, initLabels, renderLabels, disposeLabels, setLabelsVisible } from './interaction.js';
+import { initUI, advanceTime, getNormalizedTime } from './uiPanels.js';
+import { initExporter } from './exporter.js';
 
 let scene, camera, renderer, controls, clock, rs;
 let animFrameId = null, mounted = false;
 const celestialItems = [];
+const bodyBaseStates = new Map(); // id → { position, color, scale }
+const orbitLines = []; // THREE.Line[] 轨道环
 
 const FACTORY = {
   black_hole: createBlackHole, giant_star: createGiantStar, main_sequence: createMainSequence,
@@ -72,9 +75,37 @@ function buildGalaxy(snapshot) {
     const item = factory(body);
     item.group.position.set(body.position[0], body.position[1], body.position[2]);
     item.body = body;
+
+    bodyBaseStates.set(body.id, {
+      position: new window.THREE.Vector3(body.position[0], body.position[1], body.position[2]),
+      color: body.visual?.colorHex || '#ffffff',
+      scale: body.visual?.radius || 1
+    });
+
     scene.add(item.group);
     return item;
   }).filter(Boolean);
+}
+
+function applyTimeAnimation(t) {
+  const T = window.THREE;
+  for (const item of celestialItems) {
+    if (!item?.body) continue;
+    const base = bodyBaseStates.get(item.body.id);
+    if (!base) continue;
+    const phase = item.body.id.charCodeAt(0) + (item.body.id.charCodeAt(item.body.id.length - 1) || 0);
+    const orbitT = t * Math.PI * 2;
+    const pulse = 1 + 0.06 * Math.sin(orbitT * 0.5 + phase);
+    const driftX = 0.3 * Math.sin(orbitT * 0.3 + phase * 0.1);
+    const driftZ = 0.3 * Math.cos(orbitT * 0.25 + phase * 0.13);
+    const driftY = 0.15 * Math.sin(orbitT * 0.2 + phase * 0.07);
+    item.group.position.set(
+      base.position.x + driftX,
+      base.position.y + driftY,
+      base.position.z + driftZ
+    );
+    item.group.scale.set(pulse, pulse, pulse);
+  }
 }
 
 // ── animate ──
@@ -82,10 +113,16 @@ function animate() {
   animFrameId = requestAnimationFrame(animate);
   if (!mounted) return;
   const delta = Math.min(clock.getDelta(), 0.1);
+  advanceTime(delta);
+  const t = getNormalizedTime();
+  applyTimeAnimation(t);
   for (const item of celestialItems) { if (item.update) item.update(delta); }
   updateInteraction(delta);
+  renderLabels();
   if (controls) controls.update();
-  if (renderer && scene && camera) renderer.render(scene, camera);
+  const composer = rs?.getComposer();
+  if (composer) composer.render();
+  else if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
 // ── bootstrap (同步，不阻塞) ──
@@ -97,10 +134,31 @@ function boot() {
   scene = rs.scene; camera = rs.camera; renderer = rs.renderer;
   controls = rs.controls; clock = rs.clock;
 
-  createStarfield(scene);
+  const pp = initPostProcessing(rs, { strength: 0.5, radius: 0.4, threshold: 0.0 });
+  renderer.__pp = pp;
+
+  createSkybox(scene);
 
   const items = buildGalaxy(EXAMPLE);
   celestialItems.push(...items);
+
+  // 为所有 planet_system 创建轨道环
+  const parentPositions = new Map();
+  for (const item of celestialItems) {
+    if (item.body && item.body.type !== 'planet_system') {
+      parentPositions.set(item.body.id, item.group.position.clone());
+    }
+  }
+  for (const item of celestialItems) {
+    if (item.body?.type === 'planet_system' && item.body.motion?.parentBodyId) {
+      const parentPos = parentPositions.get(item.body.motion.parentBodyId);
+      const line = createOrbitLine(item.body, parentPos || new window.THREE.Vector3(0, 0, 0));
+      if (line) {
+        scene.add(line);
+        orbitLines.push(line);
+      }
+    }
+  }
 
   items.forEach(item => {
     item.group.traverse(obj => {
@@ -112,6 +170,32 @@ function boot() {
 
   initInteraction(rs);
   initUI();
+  initExporter(rs);
+
+  // CSS2D 标签初始化
+  initLabels(rs, celestialItems);
+
+  // 轨道线开关
+  const btnOrbits = document.getElementById('btn-orbits');
+  if (btnOrbits) {
+    btnOrbits.addEventListener('click', () => {
+      const visible = btnOrbits.classList.toggle('active');
+      orbitLines.forEach(line => { if (line) line.visible = visible; });
+    });
+    const isActive = btnOrbits.classList.contains('active');
+    orbitLines.forEach(line => { if (line) line.visible = isActive; });
+  }
+
+  // 标签开关
+  const btnLabels = document.getElementById('btn-labels');
+  if (btnLabels) {
+    btnLabels.addEventListener('click', () => {
+      const visible = btnLabels.classList.toggle('active');
+      setLabelsVisible(visible);
+    });
+    const isLabelsActive = btnLabels.classList.contains('active');
+    setLabelsVisible(isLabelsActive);
+  }
 
   // 移除加载画面
   const ls = document.getElementById('loading-screen');
@@ -131,6 +215,7 @@ async function tryLoadServer() {
     if (!snap?.bodies) return;
 
     // 清理旧体
+    disposeLabels();
     celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
     celestialItems.length = 0;
 
@@ -143,6 +228,11 @@ async function tryLoadServer() {
         }
       });
     });
+
+    // 重建标签
+    initLabels(rs, celestialItems);
+    const isLabelsActive = document.getElementById('btn-labels')?.classList.contains('active');
+    setLabelsVisible(!!isLabelsActive);
   } catch { /* server data optional */ }
 }
 
@@ -158,9 +248,15 @@ export function unmountMindGalaxy() {
   if (animFrameId) cancelAnimationFrame(animFrameId);
   animFrameId = null;
   disposeInteraction();
+  disposeLabels();
+  disposePostProcessing(rs);
   if (controls) controls.dispose();
   celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
   celestialItems.length = 0;
+  bodyBaseStates.clear();
+  orbitLines.forEach(line => { disposeOrbitLine(line); });
+  orbitLines.length = 0;
+  disposeSkybox(scene);
   disposeScene(scene, renderer, controls);
   scene = camera = renderer = controls = clock = rs = null;
 }

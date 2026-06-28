@@ -1,7 +1,7 @@
-/**
- * 心智星系 v2 · 渲染器
- * 职责：Three.js Scene/Camera/Renderer/Controls/Lighting/Raycaster 管理
- */
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
 export function initRenderer(container) {
   const THREE = window.THREE;
   if (!THREE) throw new Error('Three.js not loaded');
@@ -47,10 +47,13 @@ export function initRenderer(container) {
   const clock = new THREE.Clock();
   const mouse = new THREE.Vector2();
 
+  let composer = null;
+
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if (composer) composer.setSize(window.innerWidth, window.innerHeight);
   }
   window.addEventListener('resize', onResize, { passive: true });
 
@@ -62,8 +65,50 @@ export function initRenderer(container) {
     raycaster,
     clock,
     mouse,
-    _resizeFn: onResize
+    _resizeFn: onResize,
+    getComposer: () => composer,
+    setComposer: (c) => { composer = c; }
   };
+}
+
+export function initPostProcessing(rs, params = {}) {
+  const THREE = window.THREE;
+  const { scene, camera, renderer } = rs;
+  const composer = new EffectComposer(renderer);
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    params.strength ?? 0.5,
+    params.radius ?? 0.4,
+    params.threshold ?? 0.0
+  );
+  composer.addPass(bloomPass);
+
+  if (rs.setComposer) rs.setComposer(composer);
+
+  return { composer, bloomPass };
+}
+
+export function disposePostProcessing(rs) {
+  if (rs && rs.getComposer) {
+    const c = rs.getComposer();
+    if (c) {
+      c.dispose();
+      rs.setComposer(null);
+    }
+  }
+}
+
+function disposeMaterial(mat) {
+  if (mat.map) mat.map.dispose();
+  if (mat.lightMap) mat.lightMap.dispose();
+  if (mat.bumpMap) mat.bumpMap.dispose();
+  if (mat.normalMap) mat.normalMap.dispose();
+  if (mat.specularMap) mat.specularMap.dispose();
+  if (mat.envMap) mat.envMap.dispose();
+  mat.dispose();
 }
 
 export function disposeScene(scene, renderer, controls) {
@@ -90,21 +135,100 @@ export function disposeScene(scene, renderer, controls) {
       renderer.domElement.parentNode.removeChild(renderer.domElement);
     }
   }
-  window.removeEventListener('resize', scene?._resizeFn);
 }
 
-function disposeMaterial(mat) {
-  if (mat.map) mat.map.dispose();
-  if (mat.lightMap) mat.lightMap.dispose();
-  if (mat.bumpMap) mat.bumpMap.dispose();
-  if (mat.normalMap) mat.normalMap.dispose();
-  if (mat.specularMap) mat.specularMap.dispose();
-  if (mat.envMap) mat.envMap.dispose();
-  mat.dispose();
+export function createOrbitLine(planetBody, parentPos) {
+  const T = window.THREE;
+  if (!T || !planetBody?.motion?.orbitRadius) return null;
+
+  const radius = planetBody.motion.orbitRadius || 5;
+  const inclination = planetBody.motion.orbitInclination || 0;
+  const phase = planetBody.motion.orbitPhase || 0;
+  const eccentricity = planetBody.motion.eccentricity || 0;
+
+  const segments = 96;
+  const points = [];
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2 + phase;
+    const r = radius * (1 + eccentricity * Math.cos(angle));
+    const x = Math.cos(angle) * r;
+    const z = Math.sin(angle) * r;
+    const y = Math.sin(angle) * Math.sin(inclination) * r;
+    points.push(new T.Vector3(x, y, z));
+  }
+
+  const geo = new T.BufferGeometry().setFromPoints(points);
+  const mat = new T.LineBasicMaterial({
+    color: 0x334466,
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false
+  });
+  const line = new T.Line(geo, mat);
+
+  if (parentPos) {
+    line.position.copy(parentPos);
+  }
+
+  return line;
 }
 
-export function startAnimation(frameFn) {
-  // managed by index.js
+export function disposeOrbitLine(line) {
+  if (!line) return;
+  if (line.geometry) line.geometry.dispose();
+  if (line.material) line.material.dispose();
+}
+
+export function createSkybox(scene) {
+  const T = window.THREE;
+  if (!T || !scene) return null;
+  const SIZE = 512;
+  const canvases = [];
+  for (let f = 0; f < 6; f++) {
+    const c = document.createElement('canvas');
+    c.width = c.height = SIZE;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, SIZE, SIZE);
+    grad.addColorStop(0, '#050518');
+    grad.addColorStop(0.5, '#0a0a30');
+    grad.addColorStop(1, '#020210');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    for (let i = 0; i < 200; i++) {
+      const x = Math.random() * SIZE;
+      const y = Math.random() * SIZE;
+      const brightness = 0.3 + Math.random() * 0.7;
+      const r = 0.5 + Math.random() * 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(180,200,255,${brightness})`;
+      ctx.fill();
+    }
+    for (let i = 0; i < 3; i++) {
+      const nx = Math.random() * SIZE;
+      const ny = Math.random() * SIZE;
+      const grd = ctx.createRadialGradient(nx, ny, 0, nx, ny, 60 + Math.random() * 80);
+      grd.addColorStop(0, 'rgba(60,40,120,0.12)');
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, SIZE, SIZE);
+    }
+    canvases.push(c);
+  }
+  const texture = new T.CubeTexture(canvases);
+  texture.needsUpdate = true;
+  texture._canvases = canvases;
+  scene.background = texture;
+  return texture;
+}
+
+export function disposeSkybox(scene) {
+  if (!scene) return;
+  const bg = scene.background;
+  if (bg?._canvases) {
+    bg.dispose();
+  }
+  scene.background = null;
 }
 
 export function stopAnimation(id) {

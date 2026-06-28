@@ -20,6 +20,12 @@ let controls = null;
 let animFrameId = null;
 let clock = null;
 let cosmosData = null;
+let raycaster = null;
+let hoveredObj = null;
+let _origEmissive = null;
+let _tooltipEl = null;
+let _onMouseMoveFn = null;
+let _onMouseLeaveFn = null;
 
 // 3D 对象引用（用于动画和清理）
 let sunGroup = null;
@@ -38,6 +44,26 @@ export function mountCosmos(container) {
 export function unmountCosmos() {
   if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; }
   if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+
+  // 清理 Raycaster 事件
+  if (renderer?.domElement && _onMouseMoveFn) {
+    renderer.domElement.removeEventListener('mousemove', _onMouseMoveFn);
+  }
+  if (renderer?.domElement && _onMouseLeaveFn) {
+    renderer.domElement.removeEventListener('mouseleave', _onMouseLeaveFn);
+  }
+  _onMouseMoveFn = null;
+  _onMouseLeaveFn = null;
+  hoveredObj = null;
+  _origEmissive = null;
+  raycaster = null;
+
+  // 清理 tooltip
+  if (_tooltipEl?.parentNode) {
+    _tooltipEl.parentNode.removeChild(_tooltipEl);
+  }
+  _tooltipEl = null;
+
   if (controls) { controls.dispose(); controls = null; }
   if (renderer) {
     renderer.setAnimationLoop(null);
@@ -204,8 +230,68 @@ function initThreeScene(container) {
     }
   };
   window.addEventListener('resize', onResize);
-  // 保存引用以便清理
   renderer._onResize = onResize;
+
+  // ── Raycaster + Tooltip ──
+  raycaster = new THREE.Raycaster();
+  raycaster.params.Points.threshold = 0.5;
+
+  _tooltipEl = document.createElement('div');
+  _tooltipEl.id = 'cosmos-tooltip';
+  _tooltipEl.style.cssText = 'position:absolute;z-index:30;pointer-events:none;background:hsla(240,20%,8%,0.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid hsla(260,30%,40%,0.35);border-radius:0.65rem;padding:0.55rem 0.8rem;font-size:0.78rem;color:#e0e0e0;font-family:"Noto Serif SC",serif;letter-spacing:0.04em;white-space:nowrap;display:none;transition:opacity 0.15s;';
+  container.appendChild(_tooltipEl);
+
+  const mouse = new THREE.Vector2();
+
+  _onMouseMoveFn = (event) => {
+    if (!raycaster || !camera || !scene) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const clickables = [];
+    scene.traverse(obj => { if (obj.userData?.clickable && (obj.isMesh || obj.isPoints)) clickables.push(obj); });
+    const intersects = raycaster.intersectObjects(clickables, false);
+
+    if (intersects.length > 0) {
+      const obj = intersects[0].object;
+      if (hoveredObj !== obj) {
+        resetHover();
+        hoveredObj = obj;
+        if (obj.material) {
+          _origEmissive = obj.material.emissiveIntensity != null ? obj.material.emissiveIntensity : 0;
+          obj.material.emissiveIntensity = Math.min(3, _origEmissive * 2);
+        }
+        // Points material has no emissiveIntensity, highlight via opacity
+        if (obj.material && obj.material.opacity != null && obj.material.emissiveIntensity == null) {
+          _origEmissive = obj.material.opacity;
+          obj.material.opacity = Math.min(1, _origEmissive * 1.6);
+        }
+      }
+      const label = obj.userData?.label || '';
+      const typeLabel = obj.userData?.type || '';
+      if (_tooltipEl) {
+        _tooltipEl.innerHTML = '<div style="font-weight:600;">' + label + '</div><div style="font-size:0.65rem;color:hsla(240,6%,55%,1);margin-top:0.15rem;">' + typeLabel + '</div>';
+        _tooltipEl.style.display = 'block';
+        _tooltipEl.style.left = Math.min(event.clientX - rect.left + 15, rect.width - 180) + 'px';
+        _tooltipEl.style.top = Math.max(event.clientY - rect.top - 55, 5) + 'px';
+      }
+    } else {
+      resetHover();
+      hoveredObj = null;
+      if (_tooltipEl) _tooltipEl.style.display = 'none';
+    }
+  };
+
+  _onMouseLeaveFn = () => {
+    resetHover();
+    hoveredObj = null;
+    if (_tooltipEl) _tooltipEl.style.display = 'none';
+  };
+
+  renderer.domElement.addEventListener('mousemove', _onMouseMoveFn, { passive: true });
+  renderer.domElement.addEventListener('mouseleave', _onMouseLeaveFn);
 }
 
 // ── 星空背景 ────────────────────────────────────────────
@@ -263,12 +349,15 @@ function buildCosmos(data) {
   // 1. 中心黑洞
   sunGroup = createBlackHole(data.sun);
   scene.add(sunGroup);
+  markClickable(sunGroup, { label: formatSunLabel(data.sun), type: 'sun', clickable: true });
 
   // 2. 行星
-  data.planets?.forEach(p => {
+  data.planets?.forEach((p, i) => {
     const group = createPlanet(p);
+    group._planetId = p.id;
     scene.add(group);
     planetGroups.push(group);
+    markClickable(group, { label: formatPlanetLabel(p.type), type: 'planet', clickable: true });
   });
 
   // 3. 卫星
@@ -276,18 +365,25 @@ function buildCosmos(data) {
     const group = createSatellite(s, planetIdMap);
     scene.add(group);
     satelliteGroups.push(group);
+    markClickable(group, { label: formatSatelliteLabel(s.distortion_type), type: 'satellite', clickable: true });
   });
 
   // 4. 暗星云
   data.nebulas?.forEach(n => {
     nebulaPoints = createNebula(n);
-    if (nebulaPoints) scene.add(nebulaPoints);
+    if (nebulaPoints) {
+      nebulaPoints.userData = { label: n.title || '潜意识暗星云', type: 'nebula', clickable: true };
+      scene.add(nebulaPoints);
+    }
   });
 
   // 5. 碎石带
   data.desire_clumps?.forEach(c => {
     clumpPoints = createLagrangeClump(c, planetIdMap);
-    if (clumpPoints) scene.add(clumpPoints);
+    if (clumpPoints) {
+      clumpPoints.userData = { label: c.object_name || '欲望碎石带', type: 'clump', clickable: true };
+      scene.add(clumpPoints);
+    }
   });
 }
 
@@ -645,4 +741,61 @@ function disposeGroup(group) {
     group._orbitLine.material.dispose();
     scene?.remove(group._orbitLine);
   }
+}
+
+// ── Raycaster 工具 ──
+
+function markClickable(group, userData) {
+  group.traverse(obj => {
+    if (obj.isMesh) {
+      obj.userData = { ...obj.userData, ...userData };
+    }
+  });
+}
+
+function resetHover() {
+  if (hoveredObj?.material && _origEmissive != null) {
+    if (hoveredObj.material.emissiveIntensity != null) {
+      hoveredObj.material.emissiveIntensity = _origEmissive;
+    }
+    if (hoveredObj.material.opacity != null && hoveredObj.material.emissiveIntensity == null) {
+      hoveredObj.material.opacity = _origEmissive;
+    }
+    _origEmissive = null;
+  }
+}
+
+// ── 标签格式化 ──
+
+function formatSunLabel(sunData) {
+  const schema = sunData?.cbt_schema_type;
+  if (schema) return schema;
+  if (sunData?.physical_fields?.hawking_radiation_label) return sunData.physical_fields.hawking_radiation_label;
+  return '认知核心';
+}
+
+function formatPlanetLabel(type) {
+  if (!type) return '未知行星';
+  const map = {
+    CAREER_AMBITION: '事业野心',
+    INTIMACY_RELATIONSHIP: '亲密关系',
+    EGO_IDENTITY: '自我认同',
+    SOCIAL_MASK: '社会面具',
+    CREATIVE_DRIVE: '创作驱动',
+    KNOWLEDGE_HUNGER: '求知渴望'
+  };
+  return map[type] || type.replace(/_/g, ' ');
+}
+
+function formatSatelliteLabel(distortionType) {
+  if (!distortionType) return '自动思维';
+  const map = {
+    CATASTROPHIZING: '灾难化思维',
+    POLARIZED_THINKING: '非黑即白',
+    OVERGENERALIZATION: '过度概括',
+    MIND_READING: '读心术',
+    EMOTIONAL_REASONING: '情绪推理',
+    LABELING: '贴标签'
+  };
+  return map[distortionType] || distortionType.replace(/_/g, ' ');
 }
