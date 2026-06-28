@@ -111,7 +111,7 @@ async function main() {
     // 测试 5b: 标签列表
     try {
       const { status, data } = await api('GET', '/tags', null, token);
-      if (status === 200 && Array.isArray(data.data)) ok('标签列表');
+      if (status === 200 && Array.isArray(data.data?.tags)) ok('标签列表');
       else fail('标签列表', JSON.stringify(data));
     } catch (e) { fail('标签列表', e.message); }
 
@@ -127,7 +127,7 @@ async function main() {
     // 测试 6b: 知识库列表
     try {
       const { status, data } = await api('GET', '/knowledge-bases', null, token);
-      if (status === 200 && Array.isArray(data.data)) ok('知识库列表');
+      if (status === 200 && Array.isArray(data.data?.knowledgeBases)) ok('知识库列表');
       else fail('知识库列表', JSON.stringify(data));
     } catch (e) { fail('知识库列表', e.message); }
 
