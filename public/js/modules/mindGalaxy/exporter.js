@@ -321,3 +321,213 @@ export function stopVideo() {
     _videoRecorder.stop();
   }
 }
+
+// ── C25: 分享海报模板 ──
+
+export function renderShareTemplate(type, renderer, snapshotData) {
+  const size = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, size, size);
+
+  switch (type) {
+    case 'poster':
+      renderPoster(ctx, size, renderer, snapshotData);
+      break;
+    case 'time':
+      renderTimeCompare(ctx, size, snapshotData);
+      break;
+    case 'belief':
+      renderBeliefChart(ctx, size, snapshotData);
+      break;
+    case 'emotion':
+      renderEmotionSpectrum(ctx, size, snapshotData);
+      break;
+  }
+
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `mind-galaxy-${type}-${Date.now()}.png`;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast(`${typeNames[type]}已导出`);
+  }, 'image/png');
+}
+
+const typeNames = { poster: '星系海报', time: '时间对比', belief: '信念星图', emotion: '情绪光谱' };
+
+function renderPoster(ctx, size, renderer, snapshotData) {
+  if (renderer) {
+    const srcCanvas = renderer.domElement;
+    const scale = Math.min((size - 160) / srcCanvas.width, (size - 400) / srcCanvas.height);
+    const w = srcCanvas.width * scale, h = srcCanvas.height * scale;
+    const x = (size - w) / 2, y = 60;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x, y, w, h);
+    ctx.drawImage(srcCanvas, x, y, w, h);
+  }
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 36px "Noto Serif SC", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('心智星系', size / 2, size - 250);
+
+  const galaxyType = snapshotData?.galaxyType || 'S';
+  ctx.fillStyle = '#4fc3f7';
+  ctx.font = '24px "Noto Serif SC", serif';
+  ctx.fillText(`哈勃类型: ${galaxyType} · ${snapshotData?.bodies?.length || 0} 天体`, size / 2, size - 190);
+
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '18px "Noto Serif SC", serif';
+  ctx.fillText(new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }), size / 2, size - 140);
+
+  ctx.fillStyle = '#555555';
+  ctx.font = '14px "Noto Serif SC", serif';
+  ctx.fillText('心迹星图 · 心智星系 Mind Galaxy', size / 2, size - 100);
+}
+
+function renderTimeCompare(ctx, size, snapshotData) {
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 32px "Noto Serif SC", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('时间演化对比', size / 2, 80);
+
+  const leftR = 320, rightR = 760;
+  const cy = size / 2 + 40;
+
+  ctx.beginPath();
+  ctx.arc(leftR, cy, 180, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(20,20,60,0.8)';
+  ctx.fill();
+  ctx.strokeStyle = '#4fc3f7';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ccc';
+  ctx.font = '20px "Noto Serif SC", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('早期', leftR, cy);
+
+  ctx.beginPath();
+  ctx.arc(rightR, cy, 180, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(20,20,60,0.8)';
+  ctx.fill();
+  ctx.strokeStyle = '#ff9800';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ccc';
+  ctx.fillText('现在', rightR, cy);
+
+  ctx.beginPath();
+  ctx.moveTo(leftR + 180, cy);
+  ctx.lineTo(rightR - 180, cy);
+  ctx.strokeStyle = '#555';
+  ctx.setLineDash([8, 6]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#888';
+  ctx.font = '16px "Noto Serif SC", serif';
+  ctx.fillText('演化轨迹', (leftR + rightR) / 2, cy - 20);
+}
+
+function renderBeliefChart(ctx, size, data) {
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 32px "Noto Serif SC", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('信念星图', size / 2, 80);
+
+  const beliefs = data?.bodies?.filter(b => b.type === 'giant_star' || b.type === 'main_sequence') || [];
+  const top = beliefs.slice(0, 10);
+  if (top.length === 0) top.push({ name: '暂无信念数据', visual: { colorHex: '#888' }, meta: { belief: { strength: 0 } } });
+
+  const startY = 140, barH = 36, gap = 16, maxW = 600;
+  const maxStrength = Math.max(...top.map(b => b.meta?.belief?.strength || 0.5), 0.1);
+
+  top.forEach((b, i) => {
+    const y = startY + i * (barH + gap);
+    const strength = b.meta?.belief?.strength || 0.5;
+    const w = (strength / maxStrength) * maxW;
+    const color = b.visual?.colorHex || '#4fc3f7';
+    const polarity = b.meta?.belief?.polarity;
+
+    ctx.fillStyle = '#ccc';
+    ctx.font = '20px "Noto Serif SC", serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(b.name || '-', 210, y + barH * 0.65);
+
+    ctx.fillStyle = color;
+    ctx.fillRect(230, y, w, barH);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px "Noto Serif SC", serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${Math.round(strength * 100)}%`, 230 + w + 12, y + barH * 0.65);
+
+    if (polarity === 'pos') {
+      ctx.fillStyle = '#4fc3f7';
+      ctx.fillText('⊕', 230 + w + 80, y + barH * 0.65);
+    } else if (polarity === 'neg') {
+      ctx.fillStyle = '#ef5350';
+      ctx.fillText('⊖', 230 + w + 80, y + barH * 0.65);
+    }
+  });
+}
+
+function renderEmotionSpectrum(ctx, size, data) {
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 32px "Noto Serif SC", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('情绪光谱', size / 2, 80);
+
+  const nebulas = data?.bodies?.filter(b => b.type === 'nebula') || [];
+  const palettes = ['#FFD700', '#4169E1', '#98FB98', '#FFA07A', '#FF6347', '#9370DB', '#00CED1', '#FF69B4', '#DC143C', '#999'];
+  const cx = size / 2, cy = size / 2 + 60, outerR = 300, innerR = 80;
+  const total = nebulas.reduce((s, b) => s + (b.visual?.density || b.meta?.emotion?.intensity || 0.3), 0) || nebulas.length || 1;
+
+  let startAngle = -Math.PI / 2;
+  nebulas.slice(0, 10).forEach((n, i) => {
+    const val = n.visual?.density || n.meta?.emotion?.intensity || 0.3;
+    const sweep = (val / total) * Math.PI * 2;
+    const color = palettes[i % palettes.length];
+
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(startAngle) * innerR, cy + Math.sin(startAngle) * innerR);
+    ctx.arc(cx, cy, outerR, startAngle, startAngle + sweep);
+    ctx.lineTo(cx + Math.cos(startAngle + sweep) * innerR, cy + Math.sin(startAngle + sweep) * innerR);
+    ctx.arc(cx, cy, innerR, startAngle + sweep, startAngle, true);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(10,10,30,0.8)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const midAngle = startAngle + sweep / 2;
+    const labelR = outerR + 50;
+    ctx.fillStyle = '#ccc';
+    ctx.font = '18px "Noto Serif SC", serif';
+    ctx.textAlign = midAngle > Math.PI / 2 || midAngle < -Math.PI / 2 ? 'right' : 'left';
+    ctx.fillText(n.name || '-', cx + Math.cos(midAngle) * labelR, cy + Math.sin(midAngle) * labelR + 6);
+
+    startAngle += sweep;
+  });
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fill();
+  ctx.fillStyle = '#ccc';
+  ctx.font = '16px "Noto Serif SC", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('我', cx, cy + 6);
+}

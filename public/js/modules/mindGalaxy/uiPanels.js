@@ -340,6 +340,8 @@ function initSettings() {
           <button class="settings-tab" data-panel="hidden">隐藏列表</button>
           <button class="settings-tab" data-panel="person">人物管理</button>
           <button class="settings-tab" data-panel="mapping">映射规则</button>
+          <button class="settings-tab" data-panel="poster">分享海报</button>
+          <button class="settings-tab" data-panel="report">解读报告</button>
         </div>
         <div id="settings-body" style="padding:20px;"></div>
         <div style="padding:0 20px 20px;text-align:right;">
@@ -375,6 +377,8 @@ function switchPanel(name) {
     case 'hidden': renderHiddenPanel(body); break;
     case 'person': renderPersonPanel(body); break;
     case 'mapping': renderMappingPanel(body); break;
+    case 'poster': renderPosterPanel(body); break;
+    case 'report': renderReportPanel(body); break;
   }
 }
 
@@ -572,6 +576,147 @@ function renderMappingPanel(body) {
     localStorage.removeItem('mg_mapping_rules');
     renderMappingPanel(body);
   });
+}
+
+// ── C25: 分享海报面板 ──
+function renderPosterPanel(body) {
+  body.innerHTML = `
+    <h4 style="margin:0 0 16px;color:#4fc3f7;">分享海报</h4>
+    <p style="font-size:0.75rem;color:#888;margin-bottom:16px;">生成 1080×1080 PNG，适合微信/微博分享</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <button class="poster-btn" data-type="poster" style="padding:14px;background:hsla(260,30%,20%,0.5);border:1px solid hsla(260,30%,40%,0.4);border-radius:8px;color:#e0e0e0;cursor:pointer;transition:all 0.2s;">
+        <div style="font-size:1.5rem;margin-bottom:4px;">🌌</div>
+        <div style="font-size:0.85rem;font-weight:600;">星系海报</div>
+        <div style="font-size:0.65rem;color:#888;">全图 + 类型标注</div>
+      </button>
+      <button class="poster-btn" data-type="time" style="padding:14px;background:hsla(260,30%,20%,0.5);border:1px solid hsla(260,30%,40%,0.4);border-radius:8px;color:#e0e0e0;cursor:pointer;transition:all 0.2s;">
+        <div style="font-size:1.5rem;margin-bottom:4px;">⏳</div>
+        <div style="font-size:0.85rem;font-weight:600;">时间对比</div>
+        <div style="font-size:0.65rem;color:#888;">早期 vs 现在</div>
+      </button>
+      <button class="poster-btn" data-type="belief" style="padding:14px;background:hsla(260,30%,20%,0.5);border:1px solid hsla(260,30%,40%,0.4);border-radius:8px;color:#e0e0e0;cursor:pointer;transition:all 0.2s;">
+        <div style="font-size:1.5rem;margin-bottom:4px;">⭐</div>
+        <div style="font-size:0.85rem;font-weight:600;">信念星图</div>
+        <div style="font-size:0.65rem;color:#888;">TOP 10 信念</div>
+      </button>
+      <button class="poster-btn" data-type="emotion" style="padding:14px;background:hsla(260,30%,20%,0.5);border:1px solid hsla(260,30%,40%,0.4);border-radius:8px;color:#e0e0e0;cursor:pointer;transition:all 0.2s;">
+        <div style="font-size:1.5rem;margin-bottom:4px;">🎭</div>
+        <div style="font-size:0.85rem;font-weight:600;">情绪光谱</div>
+        <div style="font-size:0.65rem;color:#888;">情绪分布环图</div>
+      </button>
+    </div>
+  `;
+
+  body.querySelectorAll('.poster-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const type = btn.dataset.type;
+      const { renderShareTemplate } = await import('./exporter.js');
+      const renderer = window.__mgRenderer || null;
+      const snapshotData = window.__mgSnapshot || {};
+      renderShareTemplate(type, renderer, snapshotData);
+    });
+  });
+}
+
+// ── C26: 报告解读面板 ──
+async function renderReportPanel(body) {
+  body.innerHTML = '<p style="color:#888;">加载报告中...</p>';
+
+  try {
+    const { ApiClient } = await import('../../api.js');
+    const client = new ApiClient();
+    const snapshotRes = await client.request('/mind-galaxy/snapshot', { headers: client.getHeaders() });
+    if (!snapshotRes?.success || !snapshotRes.data?.id) {
+      body.innerHTML = '<p style="color:#e57373;">暂无星系快照，请先生成星系</p>';
+      return;
+    }
+
+    const reportRes = await client.request(`/mind-galaxy/report/${snapshotRes.data.id}`, { headers: client.getHeaders() });
+    if (!reportRes?.success) {
+      body.innerHTML = '<p style="color:#e57373;">报告生成失败</p>';
+      return;
+    }
+
+    const report = reportRes.data;
+    let html = '<h4 style="margin:0 0 12px;color:#4fc3f7;">解读报告</h4>';
+    html += `<div style="margin-bottom:12px;font-size:0.8rem;color:#aaa;">哈勃类型: ${report.hubbleType || 'S'} · 天体数量: ${report.starCount || 0}</div>`;
+
+    const beliefs = report.coreBeliefs || [];
+    if (beliefs.length > 0) {
+      html += '<div style="margin-bottom:10px;font-size:0.8rem;font-weight:600;color:#ccc;">核心信念</div>';
+      beliefs.forEach(b => {
+        html += `<div style="padding:8px 12px;background:#1a1a2e;border-radius:6px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.85rem;color:#e0e0e0;">${b.label || '-'}</span>
+            <span style="font-size:0.7rem;color:${b.polarity === 'pos' ? '#4fc3f7' : '#ef5350'};">${b.polarity === 'pos' ? '⊕' : '⊖'} ${Math.round((b.strength || 0) * 100)}%</span>
+          </div>`;
+        if (b.sourceRef?.length > 0) {
+          const ref = b.sourceRef[0];
+          html += `<div style="margin-top:6px;display:flex;gap:6px;">
+            ${ref.galaxyUrl ? `<a href="${ref.galaxyUrl}" target="_top" style="font-size:0.65rem;color:#4fc3f7;text-decoration:none;padding:2px 8px;border:1px solid #4fc3f7;border-radius:10px;">定位到星系</a>` : ''}
+            ${ref.excerpt ? `<button class="view-diary-btn" data-excerpt="${escapeHtml(ref.excerpt)}" style="font-size:0.65rem;color:#ccc;background:none;border:1px solid #555;border-radius:10px;padding:2px 8px;cursor:pointer;">查看日记</button>` : ''}
+          </div>`;
+        }
+        html += '</div>';
+      });
+    }
+
+    const persons = report.relationshipGalaxy?.topPersons || [];
+    if (persons.length > 0) {
+      html += '<div style="margin-top:12px;margin-bottom:10px;font-size:0.8rem;font-weight:600;color:#ccc;">关系人物</div>';
+      persons.forEach(p => {
+        html += `<div style="padding:8px 12px;background:#1a1a2e;border-radius:6px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.85rem;color:#e0e0e0;">${p.polarity > 0 ? '⊕' : '⊖'} ${p.name || '-'}</span>
+            <span style="font-size:0.7rem;color:#888;">亲密度 ${Math.round((p.intimacy || 0) * 100)}%</span>
+          </div>`;
+        if (p.sourceRef?.galaxyUrl) {
+          html += `<div style="margin-top:4px;">
+            <a href="${p.sourceRef.galaxyUrl}" target="_top" style="font-size:0.65rem;color:#4fc3f7;text-decoration:none;padding:2px 8px;border:1px solid #4fc3f7;border-radius:10px;">定位到星系</a>
+          </div>`;
+        }
+        html += '</div>';
+      });
+    }
+
+    body.innerHTML = html;
+
+    body.querySelectorAll('.view-diary-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const excerpt = btn.dataset.excerpt;
+        showDiaryModal(excerpt);
+      });
+    });
+  } catch (e) {
+    body.innerHTML = `<p style="color:#e57373;">加载失败: ${e.message}</p>`;
+  }
+}
+
+function showDiaryModal(text) {
+  let modal = document.getElementById('diary-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'diary-modal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center;';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div style="background:#0f0f1e;border:1px solid #2a2a4a;border-radius:12px;max-width:500px;width:90%;max-height:70vh;overflow-y:auto;padding:24px;color:#e0e0e0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h4 style="margin:0;color:#4fc3f7;font-size:0.9rem;">原始日记</h4>
+        <button id="diary-modal-close" style="background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;">&times;</button>
+      </div>
+      <div style="font-size:0.85rem;line-height:1.8;color:#ccc;white-space:pre-wrap;">${text}</div>
+    </div>
+  `;
+  modal.querySelector('#diary-modal-close').addEventListener('click', () => modal.remove());
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 export { initSettings };

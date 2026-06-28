@@ -198,7 +198,37 @@ export const getReport = asyncHandler(async (req, res) => {
       return fail(res, `报告生成失败: ${err.message}`, 500);
     }
   }
-  return success(res, report.report_json || report);
+
+  const reportJson = report.report_json || report;
+
+  // C26: 注入 sourceRef — 为每条结论附星系位置和原始日记
+  const snapshot = await repo.getSnapshotById(snapshotId);
+  if (snapshot?.snapshot_json) {
+    const snapJson = typeof snapshot.snapshot_json === 'string' ? JSON.parse(snapshot.snapshot_json) : snapshot.snapshot_json;
+    const bodies = snapJson.bodies || [];
+    const bodyByName = new Map();
+    bodies.forEach(b => { if (b.name) bodyByName.set(b.name, b.id || b.nodeId); });
+
+    // 为核心信念添加 sourceRef
+    (reportJson.coreBeliefs || []).forEach(belief => {
+      if (belief.evidence) {
+        belief.sourceRef = belief.evidence.map(ev => ({
+          excerpt: ev.excerpt || '',
+          recordId: ev.recordId || '',
+          bodyId: bodyByName.get(belief.label) || null,
+          galaxyUrl: bodyByName.get(belief.label) ? `/mind-galaxy.html?focus=${encodeURIComponent(bodyByName.get(belief.label))}` : null
+        }));
+      }
+    });
+
+    // 为关系人物添加 sourceRef
+    (reportJson.relationshipGalaxy?.topPersons || []).forEach(p => {
+      const bid = bodyByName.get(p.name);
+      p.sourceRef = bid ? { bodyId: bid, galaxyUrl: `/mind-galaxy.html?focus=${encodeURIComponent(bid)}` } : null;
+    });
+  }
+
+  return success(res, reportJson);
 });
 
 // ── v2: 配置 CRUD ──

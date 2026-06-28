@@ -154,14 +154,16 @@ export async function replaceWithSnapshot(index, smooth = false) {
 
   if (smooth && _currentSnapshot) {
     await transitionToSnapshot(json, 800);
-    _currentSnapshot = json;
+  _currentSnapshot = json;
+  window.__mgSnapshot = json;
     return;
   }
 
   _currentSnapshot = json;
-  disposeLabels();
-  celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
-  celestialItems.length = 0;
+      disposeLabels();
+      celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
+      celestialItems.length = 0;
+      window.__mgSnapshot = snap;
   orbitLines.forEach(line => { if (line) disposeOrbitLine(line); });
   orbitLines.length = 0;
 
@@ -313,6 +315,7 @@ function boot() {
   rs = initRenderer(container);
   scene = rs.scene; camera = rs.camera; renderer = rs.renderer;
   controls = rs.controls; clock = rs.clock;
+  window.__mgRenderer = renderer;
 
   const pp = initPostProcessing(rs, { strength: 0.5, radius: 0.4, threshold: 0.0 });
   renderer.__pp = pp;
