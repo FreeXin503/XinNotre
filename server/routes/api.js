@@ -26,6 +26,7 @@ import growthRoutes from './growthTree.js';      // mixed prefix: /goal + /goals
 import spectrumRoutes from './thoughtSpectrum.js';
 import cosmosRoutes from './cosmos.js';
 import galaxyRoutes from './mindGalaxy.js';
+import importRoutes from './import.js';
 import { createShareToken, getSharedSnapshot } from '../controllers/shareController.js';
 import authMiddleware from '../middleware/auth.js';
 
@@ -49,6 +50,7 @@ router.use('/memoir', memoirRoutes);
 router.use('/thought-spectrum', spectrumRoutes);
 router.use('/cosmos', cosmosRoutes);
 router.use('/mind-galaxy', galaxyRoutes);
+router.use('/import', importRoutes);
 router.post('/share', authMiddleware, createShareToken);
 router.get('/share/:token', getSharedSnapshot);
 

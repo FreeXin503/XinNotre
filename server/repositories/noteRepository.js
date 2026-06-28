@@ -85,6 +85,17 @@ class NoteRepository {
   }
 
   /**
+   * 按 UUID 查询（用于导入去重）
+   * @param {string} uuid
+   * @param {number} userId
+   * @returns {Promise<Object|null>}
+   */
+  async findByUuid(uuid, userId) {
+    const id = `do_${uuid.slice(0, 28)}`;
+    return this.findById(id, userId);
+  }
+
+  /**
    * 按标题查询（用于双向链接）
    * @param {number} userId
    * @param {string} title
@@ -141,7 +152,7 @@ class NoteRepository {
 
   /**
    * 创建便签
-   * @param {{ title: string, content: string, category: string, id?: string }} data
+   * @param {{ title: string, content: string, category: string, id?: string, meta_json?: object }} data
    * @param {number} userId
    * @returns {Promise<Object>}
    */
@@ -150,15 +161,16 @@ class NoteRepository {
     const content = String(data.content || '').substring(0, 100000);
     const category = String(data.category || '未分类').substring(0, 100);
     const wordCount = content.length;
+    const metaJson = data.meta_json !== undefined ? JSON.stringify(data.meta_json) : null;
 
     const id = (data.id && /^[A-Za-z0-9_-]{8,64}$/.test(String(data.id)))
       ? data.id
       : crypto.randomBytes(16).toString('hex');
 
     await query(
-      `INSERT INTO notes (id, user_id, title, content, category, word_count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-      [id, userId, title, content, category, wordCount]
+      `INSERT INTO notes (id, user_id, title, content, category, word_count, meta_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      [id, userId, title, content, category, wordCount, metaJson]
     );
 
     const note = await this.findById(id, userId);
