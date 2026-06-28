@@ -35,6 +35,10 @@ export const config = Object.freeze({
   deepseekKey: process.env.DEEPSEEK_KEY || '',
   deepseekUrl: process.env.DEEPSEEK_URL || 'https://api.deepseek.com/chat/completions',
 
+  // DashScope（阿里云通义千问/语音识别）
+  dashscopeKey: process.env.DASHSCOPE_API_KEY || '',
+  audioEndpoint: process.env.AUDIO_ENDPOINT || 'https://dashscope.aliyuncs.com/api/v1/services/audio/asr/transcription',
+
   // Qdrant 向量数据库（可选）
   qdrantUrl: process.env.QDRANT_URL || '',
 

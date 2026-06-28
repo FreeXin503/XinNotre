@@ -171,6 +171,70 @@ async function streamGeminiSSE(resp, onChunk, signal, model) {
   return { text: fullText, provider: 'gemini', model };
 }
 
+export async function transcribeAudio({ audioBuffer, format, language = 'zh' }) {
+  if (config.localMode) {
+    throw new Error('本地分析模式已开启，语音识别已禁用');
+  }
+
+  const apiKey = config.dashscopeKey;
+  if (!apiKey) {
+    throw new Error('未配置 DashScope API Key');
+  }
+
+  const allowedFormats = ['m4a', 'mp3', 'wav'];
+  if (!allowedFormats.includes(format)) {
+    throw new Error(`不支持的文件格式 ${format}，仅支持 ${allowedFormats.join('/')}`);
+  }
+
+  const mimeMap = { m4a: 'audio/mp4', mp3: 'audio/mpeg', wav: 'audio/wav' };
+  const blob = new Blob([audioBuffer], { type: mimeMap[format] || 'audio/mp4' });
+
+  const formData = new FormData();
+  formData.append('model', 'paraformer-v2');
+  formData.append('file', blob, `audio.${format}`);
+  formData.append('format', format);
+  formData.append('language', language);
+
+  let resp;
+  try {
+    resp = await fetch(config.audioEndpoint, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      body: formData,
+      signal: AbortSignal.timeout(120000)
+    });
+  } catch (fetchErr) {
+    throw new Error(`语音识别服务不可用: ${fetchErr.message}`);
+  }
+
+  if (!resp.ok) {
+    const errBody = await resp.text().catch(() => '');
+    throw new Error(`语音识别服务异常 (${resp.status}): ${errBody.substring(0, 200)}`);
+  }
+
+  const data = await resp.json();
+
+  const sentences = (data.sentences || data.results || []).map(s => ({
+    text: s.text || '',
+    beginTime: s.begin_time || s.beginTime || 0,
+    endTime: s.end_time || s.endTime || 0,
+    emotion: s.emotion || s.emotion_tag || undefined
+  }));
+
+  let text;
+  if (data.transcript || data.text) {
+    text = data.transcript || data.text;
+  } else {
+    text = sentences.map(s => s.text).join('').trim();
+  }
+
+  if (!text) {
+    return { text: '', sentences: [] };
+  }
+
+  return { text, sentences };
+}
+
 export function extractJson(text) {
   if (!text) return null;
   // 1. 剥离 markdown 代码块围栏

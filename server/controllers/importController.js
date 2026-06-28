@@ -5,6 +5,7 @@ import { ObsidianImporter } from '../services/import/obsidianImport.js';
 import { EvernoteImporter } from '../services/import/evernoteImport.js';
 import { FeishuImporter } from '../services/import/feishuImport.js';
 import { ChatlogImporter } from '../services/import/chatlogImport.js';
+import { VoiceImporter } from '../services/import/voiceImport.js';
 import { preprocess } from '../services/mindGalaxy/preprocessService.js';
 import noteRepository from '../repositories/noteRepository.js';
 
@@ -130,4 +131,23 @@ export const importFeishu = asyncHandler(async (req, res) => {
 
 export const importChatlog = asyncHandler(async (req, res) => {
   return handleImporterUpload(req, res, ChatlogImporter, '微信聊天记录');
+});
+
+export const importVoice = asyncHandler(async (req, res) => {
+  if (!req.file) return fail(res, '请上传音频文件（m4a/mp3/wav）', 400);
+  if (req.file.size > 25 * 1024 * 1024) return fail(res, '文件大小超过限制（最大 25MB）', 413);
+
+  const ext = (req.file.originalname || '').split('.').pop().toLowerCase();
+  if (!['m4a', 'mp3', 'wav'].includes(ext)) {
+    return fail(res, '不支持的文件格式，仅支持 m4a/mp3/wav', 400);
+  }
+
+  const userId = req.user.id;
+  const importer = new VoiceImporter();
+  const { entries, skipped: parseSkipped } = await importer.parse(req.file.buffer, { format: ext, userId });
+
+  if (entries.length === 0) return success(res, { imported: 0, message: '未识别出语音内容' });
+
+  const { imported, dedupSkipped } = await importEntries(userId, entries);
+  return success(res, { imported, skipped: parseSkipped + dedupSkipped });
 });
