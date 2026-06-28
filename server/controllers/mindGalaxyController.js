@@ -444,6 +444,41 @@ export const listPersons = asyncHandler(async (req, res) => {
   return success(res, { persons });
 });
 
+// ── D5 双人关系 ──
+import {
+  inviteUser, acceptInvitation, revokeInvitation,
+  listRelationships, getRelationshipGraph
+} from '../services/mindGalaxy/relationshipService.js';
+
+export const inviteRelationship = asyncHandler(async (req, res) => {
+  const { inviteeId } = req.body;
+  if (!inviteeId) return fail(res, '请指定邀请用户ID', 400);
+  const result = await inviteUser(req.user.id, inviteeId);
+  return success(res, result);
+});
+
+export const acceptRelationship = asyncHandler(async (req, res) => {
+  const result = await acceptInvitation(Number(req.params.invId), req.user.id);
+  return success(res, result);
+});
+
+export const revokeRelationship = asyncHandler(async (req, res) => {
+  const result = await revokeInvitation(Number(req.params.invId), req.user.id);
+  return success(res, result);
+});
+
+export const listRelationshipInvitations = asyncHandler(async (req, res) => {
+  const list = await listRelationships(req.user.id);
+  return success(res, { items: list });
+});
+
+export const getRelationshipGraphHandler = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  if (!token) return fail(res, '缺少分享 token', 400);
+  const graph = await getRelationshipGraph(token);
+  return success(res, graph);
+});
+
 export default {
   // legacy
   getGalaxyFromNotes, getGalaxyFromKnowledgeBase, getMixedGalaxy,
@@ -456,5 +491,8 @@ export default {
   // edit
   renameBody, classifyNoteToTopic, setBodyVisibility, getHiddenBodies,
   // person
-  mergePersons, updatePersonIntimacy, listPersons
+  mergePersons, updatePersonIntimacy, listPersons,
+  // relationship
+  inviteRelationship, acceptRelationship, revokeRelationship,
+  listRelationshipInvitations, getRelationshipGraphHandler
 };

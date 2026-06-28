@@ -7,7 +7,9 @@ import {
   listConfigs, deleteConfigHandler, exportGalaxy,
   setPrivacySettings, getPrivacySettings, purgeAfterAnalysis,
   renameBody, classifyNoteToTopic, setBodyVisibility, getHiddenBodies,
-  mergePersons, updatePersonIntimacy, listPersons
+  mergePersons, updatePersonIntimacy, listPersons,
+  inviteRelationship, acceptRelationship, revokeRelationship,
+  listRelationshipInvitations, getRelationshipGraphHandler
 } from '../controllers/mindGalaxyController.js';
 
 const router = Router();
@@ -56,5 +58,12 @@ router.get('/body/hidden', authMiddleware, getHiddenBodies);
 router.post('/person/merge', authMiddleware, mergePersons);
 router.put('/person/intimacy', authMiddleware, updatePersonIntimacy);
 router.get('/person/list', authMiddleware, listPersons);
+
+// ── D5 双人关系 ──
+router.post('/relationship/invite', authMiddleware, inviteRelationship);
+router.post('/relationship/accept/:invId', authMiddleware, acceptRelationship);
+router.post('/relationship/revoke/:invId', authMiddleware, revokeRelationship);
+router.get('/relationship/list', authMiddleware, listRelationshipInvitations);
+router.get('/relationship/graph/:token', getRelationshipGraphHandler);
 
 export default router;

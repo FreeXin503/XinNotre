@@ -319,7 +319,6 @@ function animate() {
   else if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
-// ── bootstrap (同步，不阻塞) ──
 function boot() {
   const container = document.getElementById('canvas-container');
   if (!container) return;
@@ -434,8 +433,61 @@ async function tryLoadServer() {
 export function mountMindGalaxy() {
   if (mounted) return;
   mounted = true;
-  boot();
-  tryLoadServer(); // 不阻塞，加载成功后自动替换
+
+  const params = new URLSearchParams(window.location.search);
+  const relToken = params.get('rel');
+
+  if (relToken) {
+    boot();
+    loadRelationship(relToken);
+  } else {
+    boot();
+    tryLoadServer();
+  }
+}
+
+async function loadRelationship(relToken) {
+  try {
+    const { loadRelationshipGalaxy, renderBridgeLegend } = await import('./relationship.js');
+    const { ApiClient } = await import('../../api.js');
+    const res = await fetch(`/api/mind-galaxy/relationship/graph/${encodeURIComponent(relToken)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success || !data.data?.bodies) return;
+
+    const { bridge, bodies: rawBodies } = data.data;
+    const mergedBodies = rawBodies.map(b => ({
+      ...b,
+      position: b.position || [0, 0, 0],
+      visual: {
+        ...b.visual,
+        colorHex: b.isBridge ? '#FFD700' : (b.visual?.colorHex || '#888888'),
+        emissiveIntensity: b.isBridge ? 2.5 : (b.visual?.emissiveIntensity || 1)
+      },
+      meta: { ...b.meta, isBridge: !!b.isBridge }
+    }));
+
+    const snap = { galaxyType: 'S', spiralArms: 3, bodies: mergedBodies };
+
+    disposeLabels();
+    celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
+    celestialItems.length = 0;
+
+    const newItems = buildGalaxy(snap);
+    celestialItems.push(...newItems);
+    newItems.forEach(item => {
+      item.group.traverse(obj => {
+        if (obj.isMesh && obj.material && item.body) {
+          obj.userData = { ...item.body, clickable: false };
+        }
+      });
+    });
+
+    initLabels(rs, celestialItems);
+    const isLabelsActive = document.getElementById('btn-labels')?.classList.contains('active');
+    setLabelsVisible(!!isLabelsActive);
+    renderBridgeLegend(bridge);
+  } catch { /* rel mode optional */ }
 }
 
 export function unmountMindGalaxy() {

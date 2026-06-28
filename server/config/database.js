@@ -60,6 +60,7 @@ export async function initDatabase() {
     { version: 'migrations_v7',      name: 'v7 mind-galaxy tables' },
     { version: 'migrations_v8',      name: 'v8 cosmos_snapshots updated_at' },
     { version: 'migrations_v9',      name: 'v9 notes meta_json + source_type extend' },
+    { version: 'migrations_v10',     name: 'v10 relationship_invitations' },
   ];
 
   try {
