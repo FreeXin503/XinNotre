@@ -51,10 +51,33 @@ export function createBlackHole(body) {
   const core = new T.Mesh(coreGeo, coreMat);
   group.add(core);
 
-  // Accretion disk (torus)
   const diskGeo = new T.TorusGeometry(r * 0.8, r * 0.15, 32, 64);
-  const diskMat = new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: T.DoubleSide });
-  const disk = new T.Mesh(diskGeo, diskMat);
+  let disk;
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    if (gl && gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS) > 0) {
+      const diskMat = new T.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uColor: { value: color },
+          uInnerRadius: { value: 0.65 },
+          uOuterRadius: { value: 1.0 }
+        },
+        vertexShader: 'varying vec2 vUv; varying vec3 vPos; void main() { vUv = uv; vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'varying vec2 vUv; varying vec3 vPos; uniform float uTime; uniform vec3 uColor; uniform float uInnerRadius; uniform float uOuterRadius; void main() { float dist = length(vPos.xy) / 2.0; float t = clamp((dist - uInnerRadius) / (uOuterRadius - uInnerRadius), 0.0, 1.0); float spiral = sin(atan(vPos.y, vPos.x) * 8.0 + uTime * 2.0 - dist * 10.0) * 0.5 + 0.5; float brightness = mix(1.0, 0.15, t) * (0.5 + spiral * 0.5); float alpha = mix(0.7, 0.1, t); gl_FragColor = vec4(uColor * brightness, alpha); }',
+        transparent: true,
+        side: T.DoubleSide,
+        depthWrite: false
+      });
+      disk = new T.Mesh(diskGeo, diskMat);
+      disk._shaderUniforms = diskMat.uniforms;
+    } else {
+      throw new Error('fallback');
+    }
+  } catch {
+    const diskMat = new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: T.DoubleSide });
+    disk = new T.Mesh(diskGeo, diskMat);
+  }
   disk.rotation.x = Math.PI / 2;
   group.add(disk);
 
@@ -66,6 +89,7 @@ export function createBlackHole(body) {
     update(delta) {
       disk.rotation.z += delta * 0.3;
       core.rotation.y += delta * 0.1;
+      if (disk._shaderUniforms) disk._shaderUniforms.uTime.value += delta;
     },
     dispose() { disposeObj(group); }
   };
@@ -152,52 +176,57 @@ export function createPlanetSystem(body) {
   };
 }
 
-// ── nebula ──
+// ── nebula (volume) ──
 
 export function createNebula(body) {
   const T = THREE();
   const group = new T.Group();
-  const count = Math.min(8000, body.visual?.particleCount || 3000);
-  const isDark = body.type === 'dark_matter';
+  const density = body.visual?.density || 0.6;
+  const radius = (body.visual?.radius || 0.2) * 10;
   const color = hexToColor(body.visual?.colorHex || '#6644AA');
-  const bound = body.visual?.density ? 5 + body.visual.density * 20 : 12;
+  const motionSpeed = body.visual?.motionSpeed || 0.3;
 
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
+  const shellGeo = new T.SphereGeometry(radius, 32, 32);
+  const shellMat = new T.MeshBasicMaterial({
+    color, transparent: true, opacity: density * 0.25, side: T.DoubleSide, depthWrite: false
+  });
+  group.add(new T.Mesh(shellGeo, shellMat));
+
+  const innerGeo = new T.SphereGeometry(radius * 0.6, 24, 24);
+  const innerMat = new T.MeshBasicMaterial({
+    color, transparent: true, opacity: density * 0.15, side: T.BackSide, depthWrite: false
+  });
+  group.add(new T.Mesh(innerGeo, innerMat));
+
+  const particleCount = Math.min(5000, body.visual?.particleCount || 3000);
+  const positions = new Float32Array(particleCount * 3);
+  const sizes = new Float32Array(particleCount);
+  for (let i = 0; i < particleCount; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const radius = bound * Math.pow(Math.random(), 0.5) * 2;
-    positions[i * 3] = Math.cos(theta) * Math.sin(phi) * radius;
-    positions[i * 3 + 1] = Math.sin(theta) * Math.sin(phi) * radius;
-    positions[i * 3 + 2] = Math.cos(phi) * radius;
-    const c = isDark ? new T.Color().setHSL(0.7, 0.1, 0.1 + Math.random() * 0.1) : color.clone().multiplyScalar(0.6 + Math.random() * 0.4);
-    colors[i * 3] = c.r;
-    colors[i * 3 + 1] = c.g;
-    colors[i * 3 + 2] = c.b;
+    const r = radius * Math.pow(Math.random(), 0.7) * 1.5;
+    positions[i * 3] = Math.cos(theta) * Math.sin(phi) * r;
+    positions[i * 3 + 1] = Math.sin(theta) * Math.sin(phi) * r;
+    positions[i * 3 + 2] = Math.cos(phi) * r;
+    sizes[i] = 0.1 + Math.random() * 0.5;
   }
-
-  const geo = new T.BufferGeometry();
-  geo.setAttribute('position', new T.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new T.BufferAttribute(colors, 3));
-  const mat = new T.PointsMaterial({
-    size: 0.4,
-    vertexColors: true,
-    blending: T.AdditiveBlending,
-    depthWrite: false,
-    transparent: true,
-    opacity: isDark ? 0.4 : 0.7
+  const particlesGeo = new T.BufferGeometry();
+  particlesGeo.setAttribute('position', new T.BufferAttribute(positions, 3));
+  particlesGeo.setAttribute('size', new T.BufferAttribute(sizes, 1));
+  const particlesMat = new T.PointsMaterial({
+    color, size: 0.25, transparent: true, opacity: density * 0.8,
+    blending: T.AdditiveBlending, depthWrite: false
   });
-  const points = new T.Points(geo, mat);
-  group.add(points);
-  group.userData = { type: isDark ? 'dark_matter' : 'nebula' };
+  const particles = new T.Points(particlesGeo, particlesMat);
+  group.add(particles);
+  group.userData = { type: 'nebula' };
 
   return {
     group,
-    points,
+    particles,
     update(delta) {
-      group.rotation.y += delta * 0.05;
-      group.rotation.x += delta * 0.02;
+      particles.rotation.y += delta * motionSpeed * 0.5;
+      particles.rotation.x += delta * motionSpeed * 0.2;
     },
     dispose() { disposeObj(group); }
   };

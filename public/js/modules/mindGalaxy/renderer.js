@@ -1,6 +1,7 @@
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 export function initRenderer(container) {
   const THREE = window.THREE;
@@ -71,6 +72,8 @@ export function initRenderer(container) {
   };
 }
 
+let _passes = null;
+
 export function initPostProcessing(rs, params = {}) {
   const THREE = window.THREE;
   const { scene, camera, renderer } = rs;
@@ -86,9 +89,56 @@ export function initPostProcessing(rs, params = {}) {
   );
   composer.addPass(bloomPass);
 
+  const rgbShiftPass = new ShaderPass(
+    new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, amount: { value: 0.001 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float amount; void main() { vec4 cr = texture2D(tDiffuse, vUv + vec2(amount, 0.0)); vec4 cg = texture2D(tDiffuse, vUv); vec4 cb = texture2D(tDiffuse, vUv - vec2(amount, 0.0)); gl_FragColor = vec4(cr.r, cg.g, cb.b, 1.0); }'
+    })
+  );
+  rgbShiftPass.enabled = false;
+  composer.addPass(rgbShiftPass);
+
+  const vignettePass = new ShaderPass(
+    new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, intensity: { value: 0.15 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float intensity; void main() { vec4 tex = texture2D(tDiffuse, vUv); float d = length(vUv - 0.5); tex.rgb *= 1.0 - d * intensity; gl_FragColor = tex; }'
+    })
+  );
+  vignettePass.enabled = false;
+  composer.addPass(vignettePass);
+
+  const grainPass = new ShaderPass(
+    new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 }, intensity: { value: 0.02 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform float time; uniform float intensity; float random(vec2 uv) { return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453); } void main() { vec4 tex = texture2D(tDiffuse, vUv); float grain = random(vUv + time) * intensity; tex.rgb += grain; gl_FragColor = tex; }'
+    })
+  );
+  grainPass.enabled = false;
+  composer.addPass(grainPass);
+
+  const dofPass = new ShaderPass(
+    new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }, blur: { value: 0.5 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec2 vUv; uniform sampler2D tDiffuse; uniform vec2 resolution; uniform float blur; void main() { vec2 invRes = 1.0 / resolution; vec4 sum = vec4(0.0); sum += texture2D(tDiffuse, vUv + vec2(-1.0, -1.0) * invRes * blur); sum += texture2D(tDiffuse, vUv + vec2(0.0, -1.0) * invRes * blur); sum += texture2D(tDiffuse, vUv + vec2(1.0, -1.0) * invRes * blur); sum += texture2D(tDiffuse, vUv + vec2(-1.0, 0.0) * invRes * blur); sum += texture2D(tDiffuse, vUv) * 1.5; sum += texture2D(tDiffuse, vUv + vec2(1.0, 0.0) * invRes * blur); sum += texture2D(tDiffuse, vUv + vec2(-1.0, 1.0) * invRes * blur); sum += texture2D(tDiffuse, vUv + vec2(0.0, 1.0) * invRes * blur); sum += texture2D(tDiffuse, vUv + vec2(1.0, 1.0) * invRes * blur); gl_FragColor = sum / 9.5; }'
+    })
+  );
+  dofPass.enabled = false;
+  composer.addPass(dofPass);
+
   if (rs.setComposer) rs.setComposer(composer);
 
-  return { composer, bloomPass };
+  _passes = { rgbShift: rgbShiftPass, vignette: vignettePass, grain: grainPass, dof: dofPass };
+
+  return { composer, bloomPass, passes: _passes };
+}
+
+export function setPostEffect(name, enabled) {
+  if (!_passes || !_passes[name]) return;
+  _passes[name].enabled = enabled;
 }
 
 export function disposePostProcessing(rs) {
