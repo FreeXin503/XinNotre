@@ -81,6 +81,8 @@ export const analyzeGalaxyStream = asyncHandler(async (req, res) => {
   const { text, source = 'notes', model } = req.body || {};
 
   setupSSE(res);
+  let aborted = false;
+  req.on('close', () => { aborted = true; });
 
   if (!text || typeof text !== 'string') {
     sendSSE(res, 'error', { error: '缺少 text 字段' });
@@ -92,9 +94,11 @@ export const analyzeGalaxyStream = asyncHandler(async (req, res) => {
     const { segments, meta } = await preprocess(userId, {
       sources: [{ type: source, text, ref: 'manual-sse', timestamp: new Date().toISOString() }]
     });
+    if (aborted) return;
     sendSSE(res, 'status', { stage: 'basic-analyze', meta });
 
     const basic = await analyzeBasic(segments);
+    if (aborted) return;
     sendSSE(res, 'status', { stage: 'deep-analyze', topics: basic.topics.length });
 
     let deep = null;
@@ -107,8 +111,10 @@ export const analyzeGalaxyStream = asyncHandler(async (req, res) => {
       sendSSE(res, 'status', { stage: 'deep-skipped', reason: 'AI unavailable' });
     }
 
+    if (aborted) return;
     sendSSE(res, 'status', { stage: 'graph-build' });
     const graph = await buildMindGraph({ basic, deep, segments });
+    if (aborted) return;
     await saveGraph(userId, graph);
 
     sendSSE(res, 'status', { stage: 'galaxy-map' });
@@ -149,9 +155,12 @@ export const generateV2Snapshot = asyncHandler(async (req, res) => {
   const { model, force } = req.body || {};
 
   setupSSE(res);
+  let aborted = false;
+  req.on('close', () => { aborted = true; });
 
   try {
     const graph = await repo.getLatestGraph(userId);
+    if (aborted) return res.end();
     if (!graph || !graph.graph_json) {
       sendSSE(res, 'error', { error: '请先运行 /analyze-stream 生成图谱' });
       return res.end();
@@ -161,6 +170,7 @@ export const generateV2Snapshot = asyncHandler(async (req, res) => {
     const snapshot = await mapToGalaxy(userId,
       typeof graph.graph_json === 'string' ? JSON.parse(graph.graph_json) : graph.graph_json
     );
+    if (aborted) return res.end();
 
     sendSSE(res, 'result', {
       snapshotId: snapshot?.id,

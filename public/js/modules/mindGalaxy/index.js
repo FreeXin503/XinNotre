@@ -10,7 +10,7 @@ import { initUI, advanceTime, getNormalizedTime } from './uiPanels.js';
 import { initExporter } from './exporter.js';
 
 let scene, camera, renderer, controls, clock, rs;
-let animFrameId = null, mounted = false;
+let animFrameId = null, mounted = false, _transitionRAF = null;
 const celestialItems = [];
 const bodyBaseStates = new Map(); // id → { position, color, scale }
 const orbitLines = []; // THREE.Line[] 轨道环
@@ -163,7 +163,7 @@ export async function replaceWithSnapshot(index, smooth = false) {
       disposeLabels();
       celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
       celestialItems.length = 0;
-      window.__mgSnapshot = snap;
+      window.__mgSnapshot = json;
   orbitLines.forEach(line => { if (line) disposeOrbitLine(line); });
   orbitLines.length = 0;
 
@@ -229,6 +229,7 @@ async function transitionToSnapshot(nextJson, durationMs = 800) {
 
   return new Promise(resolve => {
     function step(now) {
+      if (!mounted) { resolve(); return; }
       const elapsed = now - startTime;
       const t = Math.min(1, elapsed / durationMs);
       const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
@@ -275,7 +276,7 @@ async function transitionToSnapshot(nextJson, durationMs = 800) {
       });
 
       if (t < 1) {
-        requestAnimationFrame(step);
+        _transitionRAF = requestAnimationFrame(step);
       } else {
         disappearItems.forEach(item => { if (item.dispose) item.dispose(); });
         celestialItems.length = 0;
@@ -283,10 +284,21 @@ async function transitionToSnapshot(nextJson, durationMs = 800) {
         keepPairs.forEach(({ item }) => celestialItems.push(item));
         appearBodies.forEach(b => { delete b._newItem; });
         _currentSnapshot = nextJson;
+        // 重建 bodyBaseStates 防止过渡后星体漂回旧坐标
+        bodyBaseStates.clear();
+        celestialItems.forEach(item => {
+          if (item?.body?.id) {
+            bodyBaseStates.set(item.body.id, {
+              position: item.group.position.clone(),
+              color: item.body.visual?.colorHex || '#ffffff',
+              scale: item.body.visual?.radius || 1
+            });
+          }
+        });
         resolve();
       }
     }
-    requestAnimationFrame(step);
+    _transitionRAF = requestAnimationFrame(step);
   });
 }
 
@@ -428,6 +440,8 @@ export function mountMindGalaxy() {
 
 export function unmountMindGalaxy() {
   mounted = false;
+  if (_transitionRAF) cancelAnimationFrame(_transitionRAF);
+  _transitionRAF = null;
   if (animFrameId) cancelAnimationFrame(animFrameId);
   animFrameId = null;
   disposeInteraction();
