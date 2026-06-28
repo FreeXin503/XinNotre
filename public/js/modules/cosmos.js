@@ -7,6 +7,8 @@
  * 生命周期：mount → unmount（自动释放 Three.js 资源）
  * 降级：WebGL 不支持时显示文字提示
  */
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ApiClient } from '../api.js';
 
 // ── 模块状态 ────────────────────────────────────────────
@@ -212,7 +214,7 @@ function initThreeScene(container) {
   container.appendChild(renderer.domElement);
 
   // OrbitControls
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.autoRotate = false;
@@ -356,7 +358,13 @@ function initThreeScene(container) {
         <button id="cosmos-detail-close" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2rem;">&times;</button>
       </div>
       <div style="font-size:0.8rem;color:#aaa;margin-bottom:12px;">${esc(typeNames[data.type] || data.type || '未知类型')}</div>
-      ${data.meta ? Object.entries(data.meta).map(([k, v]) => `<div style="margin-bottom:6px;"><span style="color:#888;font-size:0.75rem;">${esc(k)}:</span> <span style="font-size:0.8rem;">${esc(typeof v === 'object' ? JSON.stringify(v).substring(0, 80) : v)}</span></div>`).join('') : ''}
+      ${data.meta ? Object.entries(data.meta).map(([k, v]) => {
+        let display = '';
+        if (Array.isArray(v)) display = v.join('、');
+        else if (typeof v === 'object' && v !== null) display = JSON.stringify(v).substring(0, 80);
+        else display = String(v).substring(0, 100);
+        return `<div style="margin-bottom:6px;"><span style="color:#888;font-size:0.75rem;">${esc(k)}:</span> <span style="font-size:0.8rem;">${esc(display)}</span></div>`;
+      }).join('') : ''}
     `;
     document.getElementById('cosmos-detail-close')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -486,7 +494,7 @@ function buildCosmos(data) {
     group._planetId = p.id;
     scene.add(group);
     planetGroups.push(group);
-    markClickable(group, { label: formatPlanetLabel(p.type), type: 'planet', clickable: true });
+    markClickable(group, { label: formatPlanetLabel(p.life_domain), type: 'planet', clickable: true, meta: p.psychological_meta });
   });
 
   // 3. 卫星
@@ -494,14 +502,14 @@ function buildCosmos(data) {
     const group = createSatellite(s, planetIdMap);
     scene.add(group);
     satelliteGroups.push(group);
-    markClickable(group, { label: formatSatelliteLabel(s.distortion_type), type: 'satellite', clickable: true });
+    markClickable(group, { label: formatSatelliteLabel(s.psychological_meta?.distortion_tags?.[0]), type: 'satellite', clickable: true, meta: s.psychological_meta });
   });
 
   // 4. 暗星云
   data.nebulas?.forEach(n => {
     nebulaPoints = createNebula(n);
     if (nebulaPoints) {
-      nebulaPoints.userData = { label: n.title || '潜意识暗星云', type: 'nebula', clickable: true };
+      nebulaPoints.userData = { label: n.psychological_meta?.dominant_raw_emotions?.[0] || '潜意识暗星云', type: 'nebula', clickable: true, meta: n.psychological_meta };
       scene.add(nebulaPoints);
     }
   });
@@ -510,7 +518,7 @@ function buildCosmos(data) {
   data.desire_clumps?.forEach(c => {
     clumpPoints = createLagrangeClump(c, planetIdMap);
     if (clumpPoints) {
-      clumpPoints.userData = { label: c.object_name || '欲望碎石带', type: 'clump', clickable: true };
+      clumpPoints.userData = { label: c.desire_tags?.[0] || '欲望碎石带', type: 'clump', clickable: true, meta: c };
       scene.add(clumpPoints);
     }
   });
@@ -897,9 +905,9 @@ function resetHover() {
 // ── 标签格式化 ──
 
 function formatSunLabel(sunData) {
-  const schema = sunData?.cbt_schema_type;
-  if (schema) return schema;
-  if (sunData?.physical_fields?.hawking_radiation_label) return sunData.physical_fields.hawking_radiation_label;
+  const meta = sunData?.psychological_meta;
+  if (meta?.cbt_schema_type) return meta.cbt_schema_type;
+  if (meta?.core_belief_text) return meta.core_belief_text.slice(0, 16);
   return '认知核心';
 }
 
