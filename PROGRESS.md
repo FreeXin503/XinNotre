@@ -137,4 +137,81 @@
 - **index.js**: `_transitionRAF` 变量 + unmount 取消；`__mgSnapshot` 两分支统一；`bodyBaseStates` 过渡后重建；step 函数 `!mounted` 守卫
 - **mindGalaxyController.js**: SSE 端点添加 `req.on('close')` abort 处理
 
-剩余 D1-D10 批4 为远期可选功能（导入/多人/数字孪生等），计划另行规划。
+## 批 4 · 远期扩展
+
+| 卡片 | 状态 | 文件 |
+|------|------|------|
+| D1 · import_dayone | ✅ | dayoneImport.js / importController.js / import.js / noteRepository.js / migrations_v9.sql |
+| D2 · import_notion_obsidian_etc | ✅ | baseImporter.js / notionImport.js / obsidianImport.js / evernoteImport.js / feishuImport.js |
+| D3 · import_chatlog | ✅ | chatlogImport.js / importController.js / import.js |
+| D4 · import_voice | ✅ | voiceImport.js / aiProviderService.js / config/index.js / importController.js / import.js |
+| D5 · multiplayer_relation | ✅ | relationshipService.js / mindGalaxyController.js / mindGalaxy.js / relationship.js / index.js / migrations_v10.sql |
+| D6 · multiplayer_group | ✅ | aggregateService.js / aggregator.js / migrations_v11.sql / controller/routes |
+| D7 · ai_galaxy_guide | ⬜ | |
+| D8 · ai_socratic | ⬜ | |
+| D9 · ai_belief_check | ⬜ | |
+| D10 · digital_twin_evolve | ⬜ | |
+
+### 2026-06-28：D1 DayOne JSON 导入完成
+
+- **改动文件**：dayoneImport.js, importController.js, routes/import.js, noteRepository.js, migrations_v9.sql, database.js, api.js, package.json
+- **关键决策**：
+  - `findByUuid` 通过 id 前缀模式 `do_${uuid.slice(0,28)}` 查重，uuid 缺失时降级用 content+timestamp hash
+  - `meta_json` 列通过 migrations_v9.sql 加入 notes 表，无需改已有行
+  - multer memoryStorage 处理文件上传，控制器二次校验 10MB 限制
+- **下一步**：D2 Notion/Obsidian/印象笔记/飞书 BaseImporter 抽象 + 4 格式解析
+
+### 2026-06-28：D2 BaseImporter + 4 格式导入完成
+
+- **改动文件**：baseImporter.js, notionImport.js, obsidianImport.js, evernoteImport.js, feishuImport.js, importController.js, import.js, package.json
+- **关键决策**：
+  - BaseImporter 提供 `extractTitle` / `truncateContent` 通用方法，子类只需实现 `parse(buffer) → { entries, skipped }`
+  - Notion/Obsidian 共用同一套轻量 front-matter 解析（不引 YAML 库）
+  - `[[wiki link]]` 抽取为 tags 而非创建双向链接（与 notes 表的 link 机制解耦）
+  - enex `<resource>` 替换为 `[图片未迁移]` 占位，不下载二进制
+  - 飞书 docx 使用 adm-zip 解压 + 正则提取 `<w:t>`，加密 docx 返回 400
+- **下一步**：D3 微信聊天记录导入
+
+### 2026-06-28：D3 微信聊天记录导入完成
+
+- **改动文件**：chatlogImport.js, importController.js, import.js
+- **关键决策**：
+  - 30 分钟窗口聚合：连续消息间隔 < 30 分钟归为同一 session
+  - `---- ... ----` / `-- ... --` 系统消息过滤
+  - 每条消息格式：`<timestamp> <speaker>\n<content>`，多行内容归入上一条
+  - 跨午夜对话按时间窗自然聚合，不特殊处理
+  - `meta_json.wechat` 记录 participants / messageCount / startTime / endTime
+- **下一步**：D4 语音文件导入（paraformer-v2 转写）
+
+### 2026-06-28：D4 语音导入完成（DashScope paraformer-v2）
+
+- **改动文件**：config/index.js, aiProviderService.js, voiceImport.js, importController.js, import.js
+- **关键决策**：
+  - `transcribeAudio` 为 aiProviderService.js 第三个顶层 export，复用 DASHSCOPE_API_KEY
+  - 使用 Node 18+ 内置 FormData + Blob，不引 `form-data` 包
+  - 25MB 单独 multer limit，其他导入保持 10MB
+  - 音频不存盘不存 DB，只留存转写文本
+  - 静音/无识别内容返回 `{ imported: 0, message: '未识别出语音内容' }`
+- **下一步**：D5 双人关系引力互动
+
+### 2026-06-28：D5 双人星系引力互动完成
+
+- **改动文件**：relationshipService.js, mindGalaxyController.js, mindGalaxy.js, relationship.js, index.js, migrations_v10.sql
+- **关键决策**：
+  - 邀请状态机：pending → accepted / revoked
+  - 双方星系最新快照提取人物节点，交集标为 bridge 金色高亮
+  - `?rel=<token>` URL 参数触发关系模式，前端替换示例数据
+  - `getSnapshotByIdPublic` 只读访问，不暴露原始 notes
+  - crypto.randomBytes 生成 share_token 不可预测
+- **下一步**：D6 多人匿名聚合星系
+
+### 2026-06-28：D6 多人匿名聚合星系完成
+
+- **改动文件**：aggregateService.js, aggregator.js, migrations_v11.sql, mindGalaxyController.js, mindGalaxy.js, config/index.js, database.js
+- **关键决策**：
+  - 服务端严格 schema 校验：只接受 topicVectors / emotionHistogram / anonBodies 三个字段
+  - 前端 K-Means 降维 + LOCATION 正则脱敏 + 时间戳精度降到 ISO 周
+  - 人物节点 stable 映射为 person001/person002...（同一人跨提交一致）
+  - aggregate.enabled 默认 false，环境变量 AGGREGATE_ENABLED=true 开启
+  - 纯 map-reduce 聚合，不调 LLM，批量 body 超 10MB 拒绝
+- **下一步**：D7 AI 星系向导 SSE 对话
