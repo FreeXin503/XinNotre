@@ -38,8 +38,8 @@ let _cameraTween = null;
 let sunGroup = null;
 let planetGroups = [];
 let satelliteGroups = [];
-let nebulaPoints = null;
-let clumpPoints = null;
+let nebulaPointsList = [];
+let clumpPointsList = [];
 
 // ── 生命周期 ────────────────────────────────────────────
 
@@ -100,9 +100,10 @@ export function unmountCosmos() {
   sunGroup = null;
   planetGroups = [];
   satelliteGroups = [];
-  nebulaPoints = null;
-  clumpPoints = null;
+  nebulaPointsList = [];
+  clumpPointsList = [];
   containerEl = null;
+  document.querySelector('.cosmos-empty-state')?.remove();
   delete window.refreshCosmos;
 }
 
@@ -139,9 +140,9 @@ function renderMainView() {
     </div>
   `;
 
-  document.getElementById('btn-refresh-cosmos')?.addEventListener('click', () => loadAndRender());
+  document.getElementById('btn-refresh-cosmos')?.addEventListener('click', () => generateCosmos());
 
-  window.refreshCosmos = loadAndRender;
+  window.refreshCosmos = generateCosmos;
 
   loadAndRender();
 }
@@ -180,6 +181,31 @@ async function loadAndRender() {
       errorEl.textContent = `❌ 加载失败: ${err.message || '未知错误'}`;
     }
   }
+}
+
+function generateCosmos() {
+  if (!abortCtrl) abortCtrl = new AbortController();
+  const loadingEl = document.getElementById('cosmos-loading');
+  if (loadingEl) loadingEl.style.display = 'flex';
+  const container3d = document.getElementById('cosmos-3d-container');
+  if (container3d) container3d.style.display = 'none';
+
+  ApiClient.subscribeGenerateCosmos({ force: true }, {
+    signal: abortCtrl.signal,
+    onStatus(st) {
+      if (loadingEl) loadingEl.textContent = st.message || '正在构建心智宇宙...';
+    },
+    onDone() {
+      loadAndRender();
+    },
+    onError(err) {
+      if (err.name === 'AbortError') return;
+      console.error('[cosmos] 生成失败:', err);
+      if (loadingEl) loadingEl.style.display = 'none';
+      const errorEl = document.getElementById('cosmos-error');
+      if (errorEl) { errorEl.style.display = 'flex'; errorEl.textContent = `❌ 生成失败: ${err.message || '未知错误'}`; }
+    }
+  });
 }
 
 // ── Three.js 场景初始化 ─────────────────────────────────
@@ -466,8 +492,17 @@ function createStarField() {
 
 // ── 构建心智宇宙 ─────────────────────────────────────────
 
+function showEmptyState(msg) {
+  const container3d = document.getElementById('cosmos-3d-container');
+  const loadEl = document.getElementById('cosmos-loading');
+  if (loadEl) loadEl.style.display = 'none';
+  if (container3d) container3d.style.display = 'flex';
+  container3d.innerHTML = `<div class="cosmos-empty-state" style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;color:var(--text-muted);font-size:14px;text-align:center;padding:40px;"><div style="font-size:48px;margin-bottom:16px;">🌌</div><p>${msg}</p></div>`;
+}
+
 function buildCosmos(data) {
   if (!scene || !data) return;
+  if (!data.sun) { showEmptyState('暂无心智星相图快照，请先写日记后点击"刷新快照"生成'); return; }
 
   // 清空旧对象（保留星空背景）
   if (sunGroup) { scene.remove(sunGroup); disposeGroup(sunGroup); sunGroup = null; }
@@ -475,8 +510,10 @@ function buildCosmos(data) {
   planetGroups = [];
   satelliteGroups.forEach(g => { scene.remove(g); disposeGroup(g); });
   satelliteGroups = [];
-  if (nebulaPoints) { scene.remove(nebulaPoints); nebulaPoints.geometry.dispose(); nebulaPoints.material.dispose(); nebulaPoints = null; }
-  if (clumpPoints) { scene.remove(clumpPoints); clumpPoints.geometry.dispose(); clumpPoints.material.dispose(); clumpPoints = null; }
+  nebulaPointsList.forEach(p => { scene.remove(p); p.geometry.dispose(); p.material.dispose(); });
+  nebulaPointsList = [];
+  clumpPointsList.forEach(p => { scene.remove(p); p.geometry.dispose(); p.material.dispose(); });
+  clumpPointsList = [];
 
   const planetIdMap = new Map();
   data.planets?.forEach(p => {
@@ -507,19 +544,21 @@ function buildCosmos(data) {
 
   // 4. 暗星云
   data.nebulas?.forEach(n => {
-    nebulaPoints = createNebula(n);
-    if (nebulaPoints) {
-      nebulaPoints.userData = { label: n.psychological_meta?.dominant_raw_emotions?.[0] || '潜意识暗星云', type: 'nebula', clickable: true, meta: n.psychological_meta };
-      scene.add(nebulaPoints);
+    const np = createNebula(n);
+    if (np) {
+      np.userData = { label: n.psychological_meta?.dominant_raw_emotions?.[0] || '潜意识暗星云', type: 'nebula', clickable: true, meta: n.psychological_meta };
+      scene.add(np);
+      nebulaPointsList.push(np);
     }
   });
 
   // 5. 碎石带
   data.desire_clumps?.forEach(c => {
-    clumpPoints = createLagrangeClump(c, planetIdMap);
-    if (clumpPoints) {
-      clumpPoints.userData = { label: c.desire_tags?.[0] || '欲望碎石带', type: 'clump', clickable: true, meta: c };
-      scene.add(clumpPoints);
+    const cp = createLagrangeClump(c, planetIdMap);
+    if (cp) {
+      cp.userData = { label: c.desire_tags?.[0] || '欲望碎石带', type: 'clump', clickable: true, meta: c };
+      scene.add(cp);
+      clumpPointsList.push(cp);
     }
   });
 }
@@ -665,14 +704,16 @@ function createSatellite(satData, planetIdMap) {
   const group = new THREE.Group();
   const refPlanet = planetIdMap.get(satData.parent_planet_id);
 
+  const parentGroup = planetGroups.find(g => g._planetId === satData.parent_planet_id);
+  group._parentPlanet = parentGroup || null;
+  group._orbitRadius = satData.orbit_radius;
+  group._satAngle = satData.geometry?.current_angle || 0;
+  group._satSpeed = 0.5 + Math.random() * 0.5;
+
   // 如果没有找到父行星，放在原点
   let parentPos = new THREE.Vector3(0, 0, 0);
-  if (refPlanet) {
-    // 找到父行星对应的 group
-    const parentGroup = planetGroups.find(g => g._planetId === satData.parent_planet_id);
-    if (parentGroup) {
-      parentPos.copy(parentGroup.position);
-    }
+  if (parentGroup) {
+    parentPos.copy(parentGroup.position);
   }
   group.position.copy(parentPos);
 
@@ -774,11 +815,17 @@ function createLagrangeClump(clumpData, planetIdMap) {
   const positions = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
 
+  // 计算 L4/L5 相对于父行星的位置
+  const a = refPlanet.kepler_orbit?.semi_major_axis || 30;
+  const angle = (clumpData.lagrange_point === 'L5' ? -60 : 60) * Math.PI / 180;
+  const lagrangeX = a * Math.cos(angle);
+  const lagrangeZ = a * Math.sin(angle);
+
   for (let i = 0; i < count; i++) {
     const spread = 3.0;
-    positions[i * 3] = (Math.random() - 0.5) * spread;
+    positions[i * 3] = lagrangeX + (Math.random() - 0.5) * spread;
     positions[i * 3 + 1] = (Math.random() - 0.5) * spread * 0.5;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * spread;
+    positions[i * 3 + 2] = lagrangeZ + (Math.random() - 0.5) * spread;
     sizes[i] = 0.05 + Math.random() * 0.2;
   }
 
@@ -830,6 +877,18 @@ function animate() {
       group.position.set(x, y, z);
     });
   }
+
+  // 卫星绕行星公转
+  satelliteGroups.forEach(g => {
+    if (g._parentPlanet && g._orbitRadius != null && g._satAngle != null) {
+      g._satAngle += delta * 0.02 * g._satSpeed;
+      g.position.set(
+        g._parentPlanet.position.x + Math.cos(g._satAngle) * g._orbitRadius,
+        g._parentPlanet.position.y,
+        g._parentPlanet.position.z + Math.sin(g._satAngle) * g._orbitRadius
+      );
+    }
+  });
 
   controls.update();
 }

@@ -263,5 +263,77 @@
   - past-self chat 以 epoch persona_json 为 system prompt，第一人称回答
   - digitalTwin.enabled 默认 true，设置 `DIGITAL_TWIN_ENABLED=false` 关闭
   - 单用户 cron 失败隔离（try/catch 单循环），不影响其他用户
-  - 无新数据 → skip 不创建，同一 epoch 重复请求 → skip「本周已演化」
+   - 无新数据 → skip 不创建，同一 epoch 重复请求 → skip「本周已演化」
 - **下一步**：批 4 全部完成，可进行最终核验
+
+---
+
+## 批 5 · 创新玩法模块联调与前端补齐（`21843c0`）
+
+### 改动统计
+
+| 文件 | 改动量 | 说明 |
+|------|--------|------|
+| `serve-static.js` | +60 行 | 8 个模块 Mock API handler |
+| `public/js/modules/penpal.js` | +11425B 新增 | 笔友会话列表 + 创建 + SSE 对话 |
+| `public/js/modules/letter.js` | +11340B 新增 | 时光胶囊列表 + 创建 + SSE 揭示 |
+| `public/js/modules/memoir.js` | +10579B 新增 | 回忆录列表 + SSE 生成 + 章节查看 + 发布 |
+| `public/js/api.js` | +70 行 | penpal/letter/memoir API 方法 |
+| `public/js/modules/index.js` | +9 行 | 3 个模块注册 |
+| `public/index.html` | +46 行 | 3 view containers + 3 sidebar buttons + viewMap |
+| `server/test/smoke.js` | +21 行 | 8 个创新模块端点测试 |
+
+### 状态对照更新
+
+| 模块 | 后端 | 前端 | 联调 | 入口集成 | 剩余工作 |
+|------|------|------|------|---------|---------|
+| A1 便签考古盲盒 | ✅ | ✅ | ✅ | ✅ | 无 |
+| B1 灵魂人格档案 | ✅ | ✅ | ✅ | ✅ | 无 |
+| A2 情绪天气图 | ✅ | ✅ | ✅ | ✅ | 无 |
+| B2 成长证据树 | ✅ | ✅ | ✅ | ✅ | 无 |
+| D1 生命年报卷宗 | ✅ | ✅ | ✅ | ✅ | 无 |
+| C1 跨时空笔友 | ✅ | ✅ 新建 | ✅ | ✅ | 无 |
+| C2 时光胶囊 | ✅ | ✅ 新建 | ✅ | ✅ | 无 |
+| D2 主题回忆录 | ✅ | ✅ 新建 | ✅ | ✅ | 无 |
+
+### 2026-06-28：批 5 完成 — 8 个创新玩法模块全部联调落地
+
+- **修改文件**：serve-static.js, penpal.js, letter.js, memoir.js, api.js, modules/index.js, index.html, smoke.js
+- **新增文件**：penpal.js (160行), letter.js (160行), memoir.js (160行)
+- **关键决策**：
+  - 3 个新前端模块统一采用现有的 mount/unmount 生命周期模式，与 archaeology.js/persona.js 风格一致
+  - SSE 端点（appraise、generate 等）不加 serve-static.js mock，前端在轻量模式调用时会自然显示错误提示
+  - Penpal 模块使用左右布局（线程列表 + 消息面板），与 nightLetter 模块风格对齐
+  - Letter 模块的 `subscribeOpenLetter` 使用 GET 方法（后端要求），ApiClient 中签名为 `{ method: 'GET' }`
+  - Memoir 模块的 `getMemoirExport` 使用 `/memoir/:id/export` 端点一次性返回完整章节内容
+  - 侧栏按钮按用户常用度排列：考古→人格→天气→年报→成长树→笔友→时光胶囊→回忆录→心智星系
+- **下一步**：无（全部 8 个创新玩法模块完成）
+
+### 2026-06-28：全模块回归测试 22/22 通过
+
+- **改动文件**：`server/test/smoke.js`（2 行）
+- **关键决策**：smoke test 对标签列表和知识库列表的断言 `Array.isArray(data.data)` 与后端控制器实际返回格式不符（后端返回 `{tags: [...]}` / `{knowledgeBases: [...]}` 而非裸数组），修正为 `Array.isArray(data.data?.tags)` / `Array.isArray(data.data?.knowledgeBases)`
+- **下一步**：无（批 5 全部完成，回归测试全绿）
+
+---
+
+## 批 6 · 宇宙模块高保真美化 + Bug 修复（`ccf2a07`，进行中）
+
+### 2026-06-28：Card 0A + 1A — cosmos 加载修复 + analyzer.js 跟踪
+
+- **改动文件**：`public/js/modules/cosmos.js`（98 行新增/修改）、`public/js/modules/mindGalaxy/analyzer.js`（新追踪）
+- **Card 0A 已完成**：
+  - 顶部加 `import * as THREE from 'three'` 和 `OrbitControls` ESM import，修 THREE 未定义致命 bug
+  - 修 4 处字段错配：行星 `p.type`→`p.life_domain`、卫星 `s.distortion_type`→`s.psychological_meta?.distortion_tags?.[0]`、星云 `n.title`→`n.psychological_meta?.dominant_raw_emotions?.[0]`、碎石带 `c.object_name`→`c.desire_tags?.[0]`
+  - `formatSunLabel` 从取顶层字段改为取 `psychological_meta` 子字段
+  - 详情面板 meta 渲染增强（数组用 join('、')、字符串截断 100 字符）
+  - OrbitControls 构造用 imported `OrbitControls` 替代 `THREE.OrbitControls`
+- **Card 1A 已完成**：`git add analyzer.js`（原 untracked 文件导致干净 clone 白屏）
+- **Card 0B 已完成**：
+  - 多星云/碎石带内存泄漏修复（用 `nebulaPointsList`/`clumpPointsList` 数组替代单变量）
+  - 碎石带 L4/L5 拉格朗日点定位
+  - 卫星公转动画（createSatellite 挂载 `_parentPlanet`/`_orbitRadius`/`_satAngle`/`_satSpeed`，animate 计算相对位置）
+  - 空快照保护（`buildCosmos` 检测 `data.sun`，不存在则显示 `showEmptyState` DOM 提示）
+  - 刷新按钮改为触发生成（`generateCosmos` → `subscribeGenerateCosmos` SSE 流）
+  - unmount 清理增强（`nebulaPointsList`/`clumpPointsList` 数组 dispose + `.cosmos-empty-state` DOM 清理）
+- **下一步**：Card 0C — 新建 `cosmosTextures.js` 纹理库
