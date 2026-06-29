@@ -22,6 +22,22 @@ function disposeObj(obj) {
   });
 }
 
+function createGlow(parent, colorHex, size, opacity = 0.35) {
+  const T = THREE();
+  const tex = generateGlowTexture(colorHex, 'rgba(0,0,0,0)');
+  const mat = new T.SpriteMaterial({
+    map: tex,
+    blending: T.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+    opacity
+  });
+  const sprite = new T.Sprite(mat);
+  sprite.scale.set(size, size, 1);
+  parent.add(sprite);
+  return sprite;
+}
+
 // ── binary_companion ──
 
 export function createBinaryCompanion(body) {
@@ -42,6 +58,8 @@ export function createBinaryCompanion(body) {
   const star2 = new T.Mesh(geo2, mat2);
   star2.position.set(r * 3, 0, 0);
   group.add(star2);
+  createGlow(star1, body.visual?.colorHex || '#FFA07A', r * 5, 0.35);
+  createGlow(star2, body.visual?.colorHex || '#FFA07A', r * 3.2, 0.22);
 
   // Gravity line (dashed Bezier)
   const curve = new T.CubicBezierCurve3(
@@ -124,19 +142,34 @@ export function createDarkMatter(body) {
   const r = body.visual?.opacity ? 2 + body.visual.opacity * 8 : 4;
   const color = hexToColor(body.visual?.colorHex || '#222244');
 
-  const geo = new T.SphereGeometry(r, 16, 16);
-  const mat = new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.15, side: T.BackSide });
+  const geo = new T.SphereGeometry(r, 48, 48);
+  const mat = new T.ShaderMaterial({
+    uniforms: {
+      uColor: { value: color },
+      uOpacity: { value: body.visual?.opacity || 0.35 }
+    },
+    vertexShader: 'varying vec3 vNormal; varying vec3 vView; void main() { vNormal = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vView = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'varying vec3 vNormal; varying vec3 vView; uniform vec3 uColor; uniform float uOpacity; void main() { float rim = pow(1.0 - abs(dot(vNormal, vView)), 2.5); float core = 0.16 + rim * 0.55; gl_FragColor = vec4(uColor * (0.18 + rim), core * uOpacity); }',
+    transparent: true,
+    depthWrite: false,
+    blending: T.NormalBlending,
+    side: T.DoubleSide
+  });
   group.add(new T.Mesh(geo, mat));
 
   // Inner fog
   const innerGeo = new T.SphereGeometry(r * 0.7, 16, 16);
-  const innerMat = new T.MeshBasicMaterial({ color: 0x000022, transparent: true, opacity: 0.1 });
+  const innerMat = new T.MeshBasicMaterial({ color: 0x000014, transparent: true, opacity: 0.18, depthWrite: false });
   group.add(new T.Mesh(innerGeo, innerMat));
+  const rim = createGlow(group, body.visual?.colorHex || '#222244', r * 2.2, 0.12);
 
   group.userData = { type: 'dark_matter' };
   return {
     group,
-    update() {},
+    update(delta) {
+      group.rotation.y += delta * 0.04;
+      rim.material.opacity = 0.08 + 0.05 * Math.sin(performance.now() * 0.0012);
+    },
     dispose() { disposeObj(group); }
   };
 }
@@ -186,6 +219,22 @@ export function createSupernovaRemnant(body) {
   const points = new T.Points(geo, mat);
   group.add(points);
 
+  const shockRings = [];
+  for (let i = 0; i < 3; i++) {
+    const ringGeo = new T.TorusGeometry(2.4 + i * 1.4, 0.035 + i * 0.012, 12, 96);
+    const ringMat = new T.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.35 - i * 0.08,
+      blending: T.AdditiveBlending,
+      depthWrite: false
+    });
+    const ring = new T.Mesh(ringGeo, ringMat);
+    ring.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    group.add(ring);
+    shockRings.push(ring);
+  }
+
   const coreGeo = new T.SphereGeometry(0.3, 16, 16);
   const coreMat = new T.MeshBasicMaterial({ color: 0xFFFFFF });
   group.add(new T.Mesh(coreGeo, coreMat));
@@ -211,6 +260,11 @@ export function createSupernovaRemnant(body) {
           }
         });
       }
+      shockRings.forEach((ring, index) => {
+        const pulse = 1 + 0.08 * Math.sin(performance.now() * 0.0015 + index);
+        ring.scale.set(pulse, pulse, pulse);
+        ring.rotation.z += delta * (0.08 + index * 0.03);
+      });
     },
     dispose() { disposeObj(group); }
   };
@@ -224,7 +278,9 @@ export function createNeutronStar(body) {
 
   const coreGeo = new T.SphereGeometry(0.2, 32, 32);
   const coreMat = new T.MeshBasicMaterial({ color: 0xFFFFFF });
-  group.add(new T.Mesh(coreGeo, coreMat));
+  const core = new T.Mesh(coreGeo, coreMat);
+  group.add(core);
+  const coreGlow = createGlow(group, '#AADDFF', 2.6, 0.45);
 
   const beamGeo = new T.CylinderGeometry(0.05, 0.05, 3, 8);
   let beamMat, ringMat;
@@ -265,6 +321,8 @@ export function createNeutronStar(body) {
     update(delta) {
       glowGroup.rotation.z += delta * 5;
       glowGroup.rotation.x += delta * 3;
+      coreGlow.material.opacity = 0.25 + (Math.sin(performance.now() * 0.008) * 0.5 + 0.5) * 0.45;
+      core.scale.setScalar(1 + (Math.sin(performance.now() * 0.008) * 0.5 + 0.5) * 0.18);
       if (hasShader) {
         beamMat.uniforms.uTime.value += delta;
         ringMat.uniforms.uTime.value += delta;

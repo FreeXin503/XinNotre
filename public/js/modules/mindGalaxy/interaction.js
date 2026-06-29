@@ -16,6 +16,9 @@ let labelsVisible = true;
 let _scene = null;
 let _camera = null;
 let _searchListeners = [];
+let _celestialItemsProvider = null;
+let _systemMode = false;
+let _visibilityChangeHandler = null;
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -37,6 +40,14 @@ export function initInteraction(rs) {
   window.addEventListener('keydown', onKeyDown);
 
   initSearch();
+}
+
+export function setCelestialItemsProvider(provider) {
+  _celestialItemsProvider = typeof provider === 'function' ? provider : null;
+}
+
+export function setVisibilityChangeHandler(handler) {
+  _visibilityChangeHandler = typeof handler === 'function' ? handler : null;
 }
 
 export function disposeInteraction() {
@@ -127,6 +138,10 @@ function onClick(event) {
     const obj = hits[0].object;
     selectedObj = obj;
     updateDetailPanel(obj.userData);
+    const pos = new window.THREE.Vector3();
+    selectedObj.getWorldPosition(pos);
+    const dist = selectedObj.userData?.type === 'giant_star' ? 8 : selectedObj.userData?.type === 'nebula' ? 15 : 5;
+    focusOnBody(pos, dist);
   } else {
     selectedObj = null;
     updateDetailPanel(null);
@@ -149,14 +164,20 @@ function onDoubleClick(event) {
   const pos = new window.THREE.Vector3();
   selectedObj.getWorldPosition(pos);
   const dist = selectedObj.userData?.type === 'giant_star' ? 8 : selectedObj.userData?.type === 'nebula' ? 15 : 5;
+  if (['giant_star', 'main_sequence', 'binary_companion'].includes(selectedObj.userData?.type)) {
+    enterStarSystem(selectedObj.userData);
+  }
   focusOnBody(pos, dist);
 }
 
 function onKeyDown(event) {
   switch (event.key.toLowerCase()) {
     case 'escape':
-      selectedObj = null;
-      updateDetailPanel(null);
+      if (_systemMode) exitStarSystem();
+      else {
+        selectedObj = null;
+        updateDetailPanel(null);
+      }
       break;
     case ' ':
       event.preventDefault();
@@ -172,6 +193,60 @@ function onKeyDown(event) {
       document.getElementById('btn-labels')?.click();
       break;
   }
+}
+
+function enterStarSystem(bodyData) {
+  const items = _celestialItemsProvider?.() || [];
+  const centerId = bodyData?.id || bodyData?.nodeId;
+  if (!centerId || items.length === 0) return;
+  const related = new Set([centerId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const item of items) {
+      const parentId = item.body?.motion?.parentBodyId;
+      const itemId = item.body?.id || item.body?.nodeId;
+      if (parentId && related.has(parentId) && itemId && !related.has(itemId)) {
+        related.add(itemId);
+        changed = true;
+      }
+    }
+  }
+  items.forEach(item => {
+    const itemId = item.body?.id || item.body?.nodeId;
+    const visible = related.has(itemId);
+    item.group.visible = visible;
+    item.group.traverse(obj => { if (obj.userData) obj.userData._systemHidden = !visible; });
+  });
+  _visibilityChangeHandler?.();
+  _systemMode = true;
+  showSystemToast(`已进入「${bodyData.name || '恒星'}」系统，Esc 返回全景`);
+}
+
+function exitStarSystem() {
+  const items = _celestialItemsProvider?.() || [];
+  items.forEach(item => {
+    item.group.visible = true;
+    item.group.traverse(obj => { if (obj.userData) obj.userData._systemHidden = false; });
+  });
+  _visibilityChangeHandler?.();
+  _systemMode = false;
+  flyToPreset('panoramic', 1.0);
+  showSystemToast('已返回全景视图');
+}
+
+function showSystemToast(text) {
+  let toast = document.getElementById('system-mode-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'system-mode-toast';
+    toast.style.cssText = 'position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:80;padding:0.55rem 1rem;border:1px solid hsla(260,30%,45%,0.35);border-radius:999px;background:hsla(240,20%,8%,0.82);backdrop-filter:blur(12px);color:#d9def5;font-size:0.78rem;letter-spacing:0.04em;pointer-events:none;opacity:0;transition:opacity .2s ease;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.style.opacity = '1';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 2200);
 }
 
 export function focusOnBody(targetPos, distance = 5) {
@@ -206,7 +281,7 @@ export function flyToPreset(name, duration = 1.0) {
     if (!existing) {
       const toast = document.createElement('div');
       toast.id = 'vr-reserved-toast';
-      toast.textContent = 'VR 模式预留';
+      toast.textContent = '第一人称巡游';
       toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:hsla(260,60%,30%,0.9);color:#e0e0e0;padding:0.5rem 1.5rem;border-radius:2rem;font-size:0.85rem;z-index:100;pointer-events:none;';
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2000);

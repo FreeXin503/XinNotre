@@ -2,6 +2,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { generateNebulaTexture } from './textures.js';
 
 export function initRenderer(container) {
   const THREE = window.THREE;
@@ -26,11 +27,24 @@ export function initRenderer(container) {
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.18;
   controls.minDistance = 4;
   controls.maxDistance = 60;
   controls.maxPolarAngle = Math.PI * 0.85;
   controls.target.set(0, 0, 0);
   controls.update();
+
+  let resumeRotateTimer = null;
+  controls.addEventListener('start', () => {
+    controls.autoRotate = false;
+    if (resumeRotateTimer) clearTimeout(resumeRotateTimer);
+  });
+  controls.addEventListener('end', () => {
+    if (resumeRotateTimer) clearTimeout(resumeRotateTimer);
+    resumeRotateTimer = setTimeout(() => { controls.autoRotate = true; }, 3500);
+    controls._mgAutoRotateTimer = resumeRotateTimer;
+  });
 
   const ambientLight = new THREE.AmbientLight(0x1a1a3a, 0.6);
   scene.add(ambientLight);
@@ -161,6 +175,7 @@ function disposeMaterial(mat) {
 
 export function disposeScene(scene, renderer, controls) {
   if (controls) {
+    if (controls._mgAutoRotateTimer) clearTimeout(controls._mgAutoRotateTimer);
     controls.dispose();
   }
   if (scene) {
@@ -277,6 +292,159 @@ export function disposeSkybox(scene) {
     bg.dispose();
   }
   scene.background = null;
+}
+
+export function createGalaxyBackdrop(scene) {
+  const T = window.THREE;
+  if (!T || !scene) return null;
+
+  const group = new T.Group();
+  group.name = 'galaxyBackdrop';
+
+  const starCount = 2600;
+  const starPositions = new Float32Array(starCount * 3);
+  const starColors = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const radius = 35 + Math.random() * 70;
+    starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+    starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+    starPositions[i * 3 + 2] = radius * Math.cos(phi);
+
+    const roll = Math.random();
+    const color = roll < 0.62 ? new T.Color(0xdfe8ff)
+      : roll < 0.82 ? new T.Color(0x8fb8ff)
+      : roll < 0.94 ? new T.Color(0xffd69a)
+      : new T.Color(0xff9fd4);
+    starColors[i * 3] = color.r;
+    starColors[i * 3 + 1] = color.g;
+    starColors[i * 3 + 2] = color.b;
+  }
+  const starGeo = new T.BufferGeometry();
+  starGeo.setAttribute('position', new T.BufferAttribute(starPositions, 3));
+  starGeo.setAttribute('color', new T.BufferAttribute(starColors, 3));
+  const starMat = new T.PointsMaterial({
+    size: 0.08,
+    vertexColors: true,
+    blending: T.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.88,
+    sizeAttenuation: true
+  });
+  const stars = new T.Points(starGeo, starMat);
+  stars.name = 'deepStarfield';
+  group.add(stars);
+
+  const bandCount = 5200;
+  const bandPositions = new Float32Array(bandCount * 3);
+  const bandColors = new Float32Array(bandCount * 3);
+  for (let i = 0; i < bandCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 18 + Math.random() * 72;
+    const spread = (Math.random() - 0.5) * 5.5;
+    bandPositions[i * 3] = Math.cos(angle) * radius;
+    bandPositions[i * 3 + 1] = spread + Math.sin(angle * 3) * 0.8;
+    bandPositions[i * 3 + 2] = Math.sin(angle) * radius * 0.28;
+    const color = new T.Color().setHSL(0.58 + Math.random() * 0.16, 0.55, 0.56 + Math.random() * 0.22);
+    bandColors[i * 3] = color.r;
+    bandColors[i * 3 + 1] = color.g;
+    bandColors[i * 3 + 2] = color.b;
+  }
+  const bandGeo = new T.BufferGeometry();
+  bandGeo.setAttribute('position', new T.BufferAttribute(bandPositions, 3));
+  bandGeo.setAttribute('color', new T.BufferAttribute(bandColors, 3));
+  const bandMat = new T.PointsMaterial({
+    size: 0.16,
+    vertexColors: true,
+    blending: T.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.38,
+    sizeAttenuation: true
+  });
+  const milkyWay = new T.Points(bandGeo, bandMat);
+  milkyWay.name = 'milkyWayBand';
+  milkyWay.rotation.x = -0.28;
+  milkyWay.rotation.z = 0.18;
+  group.add(milkyWay);
+
+  const nebulaDefs = [
+    { pos: [9, 4, -13], size: 20, colors: ['hsla(270, 65%, 42%, 0.13)', 'hsla(300, 60%, 36%, 0.08)', 'hsla(210, 55%, 46%, 0.06)'] },
+    { pos: [-12, -2, -10], size: 18, colors: ['hsla(205, 58%, 42%, 0.12)', 'hsla(180, 45%, 38%, 0.07)', 'hsla(260, 42%, 44%, 0.06)'] },
+    { pos: [2, 9, -18], size: 24, colors: ['hsla(30, 60%, 48%, 0.10)', 'hsla(350, 50%, 42%, 0.07)', 'hsla(290, 45%, 42%, 0.05)'] },
+    { pos: [14, -5, -9], size: 17, colors: ['hsla(320, 55%, 42%, 0.12)', 'hsla(345, 48%, 38%, 0.07)', 'hsla(275, 45%, 45%, 0.05)'] }
+  ];
+  const nebulaSprites = nebulaDefs.map((def, index) => {
+    const tex = generateNebulaTexture(def.colors, 512);
+    const sprite = new T.Sprite(new T.SpriteMaterial({
+      map: tex,
+      blending: T.AdditiveBlending,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.58
+    }));
+    sprite.name = `backdropNebula${index}`;
+    sprite.position.set(def.pos[0], def.pos[1], def.pos[2]);
+    sprite.scale.set(def.size, def.size, 1);
+    group.add(sprite);
+    return sprite;
+  });
+
+  const dustCount = 800;
+  const dustPositions = new Float32Array(dustCount * 3);
+  const dustColors = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    dustPositions[i * 3] = (Math.random() - 0.5) * 36;
+    dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 24;
+    dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+    dustColors[i * 3] = 0.45 + Math.random() * 0.45;
+    dustColors[i * 3 + 1] = 0.38 + Math.random() * 0.38;
+    dustColors[i * 3 + 2] = 0.62 + Math.random() * 0.34;
+  }
+  const dustGeo = new T.BufferGeometry();
+  dustGeo.setAttribute('position', new T.BufferAttribute(dustPositions, 3));
+  dustGeo.setAttribute('color', new T.BufferAttribute(dustColors, 3));
+  const dust = new T.Points(dustGeo, new T.PointsMaterial({
+    size: 0.035,
+    vertexColors: true,
+    blending: T.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.52,
+    sizeAttenuation: true
+  }));
+  dust.name = 'foregroundDust';
+  group.add(dust);
+
+  scene.add(group);
+  return { group, stars, milkyWay, dust, nebulaSprites };
+}
+
+export function updateGalaxyBackdrop(backdrop, delta) {
+  if (!backdrop) return;
+  if (backdrop.stars) backdrop.stars.rotation.y += delta * 0.004;
+  if (backdrop.milkyWay) backdrop.milkyWay.rotation.y += delta * 0.006;
+  if (backdrop.dust) {
+    backdrop.dust.rotation.y += delta * 0.018;
+    backdrop.dust.rotation.x += delta * 0.008;
+  }
+  backdrop.nebulaSprites?.forEach((sprite, index) => {
+    sprite.rotation.z += delta * (0.006 + index * 0.002);
+  });
+}
+
+export function disposeGalaxyBackdrop(backdrop) {
+  if (!backdrop?.group) return;
+  backdrop.group.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      if (obj.material.map) obj.material.map.dispose();
+      obj.material.dispose();
+    }
+  });
+  if (backdrop.group.parent) backdrop.group.parent.remove(backdrop.group);
 }
 
 export function stopAnimation(id) {

@@ -23,6 +23,54 @@ function createGlow(parent, colorHex, size, opacity = 0.4) {
   return sprite;
 }
 
+function createJet(parent, color, radius, direction = 1) {
+  const T = THREE();
+  const height = radius * 3.8;
+  const coneGeo = new T.ConeGeometry(radius * 0.18, height, 48, 1, true);
+  const coneMat = new T.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.28,
+    blending: T.AdditiveBlending,
+    depthWrite: false,
+    side: T.DoubleSide
+  });
+  const cone = new T.Mesh(coneGeo, coneMat);
+  cone.position.y = direction * (radius * 0.28 + height / 2);
+  if (direction < 0) cone.rotation.z = Math.PI;
+  parent.add(cone);
+
+  const particles = 260;
+  const positions = new Float32Array(particles * 3);
+  const colors = new Float32Array(particles * 3);
+  for (let i = 0; i < particles; i++) {
+    const t = Math.random();
+    const spread = radius * 0.05 + radius * 0.28 * t;
+    const angle = Math.random() * Math.PI * 2;
+    positions[i * 3] = Math.cos(angle) * spread * Math.random();
+    positions[i * 3 + 1] = direction * (radius * 0.35 + height * t);
+    positions[i * 3 + 2] = Math.sin(angle) * spread * Math.random();
+    colors[i * 3] = Math.min(1, color.r + 0.35);
+    colors[i * 3 + 1] = Math.min(1, color.g + 0.25);
+    colors[i * 3 + 2] = Math.min(1, color.b + 0.45);
+  }
+  const geo = new T.BufferGeometry();
+  geo.setAttribute('position', new T.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new T.BufferAttribute(colors, 3));
+  const mat = new T.PointsMaterial({
+    size: radius * 0.035,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.65,
+    blending: T.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true
+  });
+  const points = new T.Points(geo, mat);
+  parent.add(points);
+  return { cone, points, direction };
+}
+
 function disposeObj(obj) {
   if (!obj) return;
   if (obj.traverse) {
@@ -83,6 +131,8 @@ export function createBlackHole(body) {
   group.add(disk);
 
   createGlow(group, body.visual?.colorHex || '#4B0082', r * 3, 0.3);
+  const jetColor = new T.Color(body.visual?.jetColorHex || '#7fc8ff');
+  const jets = [createJet(group, jetColor, r, 1), createJet(group, jetColor, r, -1)];
 
   group.userData = { type: 'black_hole' };
   return {
@@ -90,6 +140,10 @@ export function createBlackHole(body) {
     update(delta) {
       disk.rotation.z += delta * 0.3;
       core.rotation.y += delta * 0.1;
+      jets.forEach((jet, index) => {
+        jet.points.rotation.y += delta * (0.55 + index * 0.12);
+        jet.cone.material.opacity = 0.22 + 0.08 * Math.sin(performance.now() * 0.0018 + index);
+      });
       if (disk._shaderUniforms) disk._shaderUniforms.uTime.value += delta;
     },
     dispose() { disposeObj(group); }
@@ -200,11 +254,23 @@ export function createNebula(body) {
     return map[e];
   }).filter(Boolean);
   const nebulaTex = generateNebulaTexture(emotionColors && emotionColors.length > 0 ? emotionColors : null);
-  const shellGeo = new T.SphereGeometry(radius, 32, 32);
-  const shellMat = new T.MeshBasicMaterial({
-    map: nebulaTex, color, transparent: true, opacity: density * 0.35, side: T.DoubleSide, depthWrite: false
-  });
-  group.add(new T.Mesh(shellGeo, shellMat));
+  const shells = [];
+  for (let i = 0; i < 3; i++) {
+    const shellGeo = new T.SphereGeometry(radius * (0.8 + i * 0.28), 32, 32);
+    const shellMat = new T.MeshBasicMaterial({
+      map: nebulaTex,
+      color,
+      transparent: true,
+      opacity: density * (0.2 - i * 0.045),
+      side: T.DoubleSide,
+      depthWrite: false,
+      blending: T.AdditiveBlending
+    });
+    const shell = new T.Mesh(shellGeo, shellMat);
+    shell.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    group.add(shell);
+    shells.push(shell);
+  }
 
   const innerGeo = new T.SphereGeometry(radius * 0.6, 24, 24);
   const innerMat = new T.MeshBasicMaterial({
@@ -239,6 +305,10 @@ export function createNebula(body) {
     group,
     particles,
     update(delta) {
+      shells.forEach((shell, index) => {
+        shell.rotation.y += delta * motionSpeed * (0.08 + index * 0.04);
+        shell.rotation.z -= delta * motionSpeed * (0.035 + index * 0.02);
+      });
       particles.rotation.y += delta * motionSpeed * 0.5;
       particles.rotation.x += delta * motionSpeed * 0.2;
     },

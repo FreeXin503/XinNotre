@@ -1,19 +1,21 @@
 /**
  * 心智星系 v2 · 主模块
  */
-import { initRenderer, initPostProcessing, disposePostProcessing, disposeScene, createOrbitLine, disposeOrbitLine, createSkybox, disposeSkybox } from './renderer.js';
+import { initRenderer, initPostProcessing, disposePostProcessing, disposeScene, createOrbitLine, disposeOrbitLine, createSkybox, disposeSkybox, createGalaxyBackdrop, updateGalaxyBackdrop, disposeGalaxyBackdrop } from './renderer.js';
 import { createBlackHole, createGiantStar, createMainSequence, createPlanetSystem, createNebula } from './celestialBodies.js';
 import { createBinaryCompanion, createAsteroidBelt, createDarkMatter, createSupernovaRemnant, createNeutronStar } from './celestialBodies2.js';
 import { spiralPosition } from './layout.js';
-import { initInteraction, updateInteraction, disposeInteraction, initLabels, renderLabels, disposeLabels, setLabelsVisible, focusOnBody } from './interaction.js';
+import { initInteraction, updateInteraction, disposeInteraction, initLabels, renderLabels, disposeLabels, setLabelsVisible, focusOnBody, setCelestialItemsProvider, setVisibilityChangeHandler } from './interaction.js';
 import { initUI, advanceTime, getNormalizedTime } from './uiPanels.js';
 import { initExporter } from './exporter.js';
 
 let scene, camera, renderer, controls, clock, rs;
 let animFrameId = null, mounted = false, _transitionRAF = null;
+let backdrop = null;
 const celestialItems = [];
 const bodyBaseStates = new Map(); // id → { position, color, scale }
 const orbitLines = []; // THREE.Line[] 轨道环
+const connectionLines = []; // THREE.Line[] 父子关系连线
 
 const FACTORY = {
   black_hole: createBlackHole, giant_star: createGiantStar, main_sequence: createMainSequence,
@@ -43,24 +45,93 @@ const EXAMPLE = {
   ]
 };
 
-// ── starfield ──
-function createStarfield(scene) {
+function createConnectionLine(fromItem, toItem, colorHex = '#7fb8ff', opacity = 0.22) {
   const T = window.THREE;
-  const n = 3000, p = new Float32Array(n * 3), c = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    const r = 50 + Math.random() * 150;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    p[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-    p[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-    p[i * 3 + 2] = r * Math.cos(phi);
-    const col = new T.Color().setHSL(0.05 + Math.random() * 0.3, 0.2 + Math.random() * 0.3, 0.5 + Math.random() * 0.5);
-    c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b;
-  }
+  if (!fromItem?.group || !toItem?.group) return null;
   const geo = new T.BufferGeometry();
-  geo.setAttribute('position', new T.BufferAttribute(p, 3));
-  geo.setAttribute('color', new T.BufferAttribute(c, 3));
-  scene.add(new T.Points(geo, new T.PointsMaterial({ size: 0.25, vertexColors: true, blending: T.AdditiveBlending, depthWrite: false })));
+  geo.setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3));
+  const mat = new T.LineBasicMaterial({
+    color: new T.Color(colorHex),
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: T.AdditiveBlending
+  });
+  const line = new T.Line(geo, mat);
+  line.userData = { fromItem, toItem };
+  updateConnectionLine(line);
+  return line;
+}
+
+function updateConnectionLine(line) {
+  const from = line.userData?.fromItem?.group;
+  const to = line.userData?.toItem?.group;
+  if (!from || !to) return;
+  line.visible = from.visible && to.visible && !!document.getElementById('btn-orbits')?.classList.contains('active');
+  const fromPos = new window.THREE.Vector3();
+  const toPos = new window.THREE.Vector3();
+  from.getWorldPosition(fromPos);
+  to.getWorldPosition(toPos);
+  const attr = line.geometry.attributes.position;
+  attr.array[0] = fromPos.x;
+  attr.array[1] = fromPos.y;
+  attr.array[2] = fromPos.z;
+  attr.array[3] = toPos.x;
+  attr.array[4] = toPos.y;
+  attr.array[5] = toPos.z;
+  attr.needsUpdate = true;
+}
+
+function rebuildOrbitAndConnectionLines() {
+  orbitLines.forEach(line => { disposeOrbitLine(line); });
+  orbitLines.length = 0;
+  connectionLines.forEach(line => { disposeOrbitLine(line); });
+  connectionLines.length = 0;
+
+  const itemById = new Map();
+  celestialItems.forEach(item => {
+    const id = item.body?.id || item.body?.nodeId;
+    if (id) itemById.set(id, item);
+  });
+  for (const item of celestialItems) {
+    const parentId = item.body?.motion?.parentBodyId;
+    if (!parentId) continue;
+    const parent = itemById.get(parentId);
+    const parentPos = parent?.group?.position || new window.THREE.Vector3(0, 0, 0);
+    const orbit = createOrbitLine(item.body, parentPos);
+    if (orbit) {
+      orbit.userData.ownerItem = item;
+      orbit.userData.parentItem = parent;
+      scene.add(orbit);
+      orbitLines.push(orbit);
+    }
+    const line = createConnectionLine(parent, item, item.body?.visual?.colorHex || '#7fb8ff');
+    if (line) { scene.add(line); connectionLines.push(line); }
+  }
+
+  const isActive = document.getElementById('btn-orbits')?.classList.contains('active');
+  orbitLines.forEach(line => { line.visible = !!isActive && line.userData?.ownerItem?.group?.visible !== false; });
+  connectionLines.forEach(updateConnectionLine);
+}
+
+function syncOrbitVisibility() {
+  const isActive = !!document.getElementById('btn-orbits')?.classList.contains('active');
+  orbitLines.forEach(line => {
+    const ownerVisible = line.userData?.ownerItem?.group?.visible !== false;
+    const parentVisible = line.userData?.parentItem?.group?.visible !== false;
+    line.visible = isActive && ownerVisible && parentVisible;
+  });
+  connectionLines.forEach(updateConnectionLine);
+}
+
+function updateOrbitLines() {
+  const isActive = !!document.getElementById('btn-orbits')?.classList.contains('active');
+  orbitLines.forEach(line => {
+    const parent = line.userData?.parentItem?.group;
+    const owner = line.userData?.ownerItem?.group;
+    if (parent) line.position.copy(parent.position);
+    line.visible = isActive && owner?.visible !== false && parent?.visible !== false;
+  });
 }
 
 // ── build ──
@@ -160,29 +231,14 @@ export async function replaceWithSnapshot(index, smooth = false) {
   }
 
   _currentSnapshot = json;
-      disposeLabels();
-      celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
-      celestialItems.length = 0;
-      window.__mgSnapshot = json;
-  orbitLines.forEach(line => { if (line) disposeOrbitLine(line); });
-  orbitLines.length = 0;
+  disposeLabels();
+  celestialItems.forEach(item => { if (item.dispose) item.dispose(); });
+  celestialItems.length = 0;
+  window.__mgSnapshot = json;
 
   const newItems = buildGalaxy(json);
   celestialItems.push(...newItems);
-
-  const parentPositions = new Map();
-  for (const item of celestialItems) {
-    if (item.body && item.body.type !== 'planet_system') {
-      parentPositions.set(item.body.id, item.group.position.clone());
-    }
-  }
-  for (const item of celestialItems) {
-    if (item.body?.type === 'planet_system' && item.body.motion?.parentBodyId) {
-      const parentPos = parentPositions.get(item.body.motion.parentBodyId);
-      const line = createOrbitLine(item.body, parentPos || new window.THREE.Vector3(0, 0, 0));
-      if (line) { scene.add(line); orbitLines.push(line); }
-    }
-  }
+  rebuildOrbitAndConnectionLines();
 
   newItems.forEach(item => {
     item.group.traverse(obj => {
@@ -309,8 +365,11 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.1);
   advanceTime(delta);
   const t = getNormalizedTime();
+  updateGalaxyBackdrop(backdrop, delta);
   applyTimeAnimation(t);
   for (const item of celestialItems) { if (item.update) item.update(delta); }
+  updateOrbitLines();
+  connectionLines.forEach(updateConnectionLine);
   updateInteraction(delta);
   renderLabels();
   if (controls) controls.update();
@@ -338,27 +397,11 @@ function boot() {
   renderer.__pp = pp;
 
   createSkybox(scene);
+  backdrop = createGalaxyBackdrop(scene);
 
   const items = buildGalaxy(EXAMPLE);
   celestialItems.push(...items);
-
-  // 为所有 planet_system 创建轨道环
-  const parentPositions = new Map();
-  for (const item of celestialItems) {
-    if (item.body && item.body.type !== 'planet_system') {
-      parentPositions.set(item.body.id, item.group.position.clone());
-    }
-  }
-  for (const item of celestialItems) {
-    if (item.body?.type === 'planet_system' && item.body.motion?.parentBodyId) {
-      const parentPos = parentPositions.get(item.body.motion.parentBodyId);
-      const line = createOrbitLine(item.body, parentPos || new window.THREE.Vector3(0, 0, 0));
-      if (line) {
-        scene.add(line);
-        orbitLines.push(line);
-      }
-    }
-  }
+  rebuildOrbitAndConnectionLines();
 
   items.forEach(item => {
     item.group.traverse(obj => {
@@ -369,6 +412,8 @@ function boot() {
   });
 
   initInteraction(rs);
+  setCelestialItemsProvider(() => celestialItems);
+  setVisibilityChangeHandler(syncOrbitVisibility);
   initUI();
   initExporter(rs);
 
@@ -379,11 +424,10 @@ function boot() {
   const btnOrbits = document.getElementById('btn-orbits');
   if (btnOrbits) {
     btnOrbits.addEventListener('click', () => {
-      const visible = btnOrbits.classList.toggle('active');
-      orbitLines.forEach(line => { if (line) line.visible = visible; });
+      btnOrbits.classList.toggle('active');
+      syncOrbitVisibility();
     });
-    const isActive = btnOrbits.classList.contains('active');
-    orbitLines.forEach(line => { if (line) line.visible = isActive; });
+    syncOrbitVisibility();
   }
 
   // 标签开关
@@ -421,6 +465,7 @@ async function tryLoadServer() {
 
     const newItems = buildGalaxy(snap);
     celestialItems.push(...newItems);
+    rebuildOrbitAndConnectionLines();
     newItems.forEach(item => {
       item.group.traverse(obj => {
         if (obj.isMesh && obj.material && item.body) {
@@ -503,6 +548,8 @@ export function unmountMindGalaxy() {
   if (animFrameId) cancelAnimationFrame(animFrameId);
   animFrameId = null;
   disposeInteraction();
+  setVisibilityChangeHandler(null);
+  setCelestialItemsProvider(null);
   disposeLabels();
   disposePostProcessing(rs);
   if (controls) controls.dispose();
@@ -511,18 +558,10 @@ export function unmountMindGalaxy() {
   bodyBaseStates.clear();
   orbitLines.forEach(line => { disposeOrbitLine(line); });
   orbitLines.length = 0;
-  _nebulaSprites.forEach(s => {
-    if (s.material?.map) s.material.map.dispose();
-    if (s.material) s.material.dispose();
-    if (s.parent) s.parent.remove(s);
-  });
-  _nebulaSprites = [];
-  if (_dustParticles) {
-    if (_dustParticles.geometry) _dustParticles.geometry.dispose();
-    if (_dustParticles.material) _dustParticles.material.dispose();
-    if (_dustParticles.parent) _dustParticles.parent.remove(_dustParticles);
-    _dustParticles = null;
-  }
+  connectionLines.forEach(line => { disposeOrbitLine(line); });
+  connectionLines.length = 0;
+  disposeGalaxyBackdrop(backdrop);
+  backdrop = null;
   disposeSkybox(scene);
   disposeScene(scene, renderer, controls);
   scene = camera = renderer = controls = clock = rs = null;
