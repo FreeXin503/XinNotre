@@ -336,4 +336,55 @@
   - 空快照保护（`buildCosmos` 检测 `data.sun`，不存在则显示 `showEmptyState` DOM 提示）
   - 刷新按钮改为触发生成（`generateCosmos` → `subscribeGenerateCosmos` SSE 流）
   - unmount 清理增强（`nebulaPointsList`/`clumpPointsList` 数组 dispose + `.cosmos-empty-state` DOM 清理）
-- **下一步**：Card 0C — 新建 `cosmosTextures.js` 纹理库
+### 2026-06-28：Card 0C~1E 全部完成 — 批6收尾
+
+- **Card 0C**：新建 `cosmosTextures.js` 纹理库（5个程序化纹理生成函数：starSurface/NebulaCloud/BlackHoleDisk/AtmosphereGlow/GalaxyBackground）
+- **Card 0D**：cosmos.js 哈勃视觉升级（EffectComposer bloom+vignette后处理、FogExp2雾效、skybox、创造Nebula球壳纹理、拉格朗日碎石带颜色升级、starField粒子5000、animate composer.render）
+- **Card 1B**：exporter.js 截图分辨率修复（临时setSize渲染后恢复） + 视频按钮SVG保留（dataset.origHtml + CSS class）
+- **Card 1C**：renderer.js bloom threshold 0→0.15、vignette/grain 默认启用；index.js 暴露 `window.__mgRenderOnce`
+- **Card 1D**：interaction.js mousemove clickables缓存（30帧TTL）、dblclick过滤clickable天体、空格key清理
+- **Card 1E**：textures.js starSurface增强为4层fbm、Nebula/BlackHoleDisk纹理强化；celestialBodies.js 导入Nebula/BlackHole贴图并应用
+
+- **改动文件**：`public/js/modules/cosmos.js` `public/js/modules/mindGalaxy/exporter.js` `index.js` `renderer.js` `interaction.js` `textures.js` `celestialBodies.js`（7文件，+221/-74行）
+- **下一步**：批6全部完成，无后续任务
+
+---
+
+## 批 7 · 宇宙观感升级 · 对齐需求文档 3D 效果（`0a45908`）
+
+### 2026-06-29：参照参考文件 + 需求文档实现 5 大缺失宇宙效果
+
+- **改动文件**：`renderer.js` `celestialBodies.js` `celestialBodies2.js` `index.js` `interaction.js` `mind-galaxy.html` `serve-static.js`（7 文件，+497/-86 行）
+- **背景宇宙层**（需求 7.1 背景层）：
+  - 新增 `createGalaxyBackdrop`：2600 颗深空星场（4 色分布）+ 5200 点银河光带（斜置椭圆带状）+ 4 片彩色深空星云 sprite + 800 颗前景尘埃粒子
+  - 每帧 `updateGalaxyBackdrop` 驱动星场/光带/尘埃/星云各自旋转，营造层次感和深空氛围
+  - 卸载时 `disposeGalaxyBackdrop` 释放全部 geometry/material/texture
+- **黑洞相对论喷流**（需求 6.3.3 喷流强度）：
+  - `createJet` 生成上下双喷流：锥体光晕 + 260 粒子流，颜色偏蓝
+  - 喷流脉动 + 粒子旋转，黑洞"活跃"感
+- **星云体积化**（需求 6.3.2 星云视觉）：
+  - `createNebula` 从单层壳改为 3 层体积壳（递增半径 + 加法混合 + 各自湍流旋转）
+  - 粒子保留，新增 shell 旋转差异
+- **双击进入恒星系统**（需求 7.3.2 双击进入）：
+  - `enterStarSystem` / `exitStarSystem`：双击 giant_star/main_sequence/binary_companion 时，根据 `motion.parentBodyId` 递归收集相关天体，隐藏外层
+  - Esc 退出并恢复全景 + 飞回总览
+  - 底部 toast 提示当前模式
+  - 轨道线和父子连线按可见性同步
+- **自动旋转 + 交互暂停**（需求 7.3.1 自动旋转）：
+  - OrbitControls 默认 `autoRotate`，用户交互后 3.5 秒恢复
+- **特殊天体动画**（需求 6.1 天体映射）：
+  - 暗物质：Fresnel rim shader + 脉动光晕（不再是无动效黑球）
+  - 超新星：3 圈冲击环 + 脉动缩放
+  - 中子星：核心脉动缩放 + 辉光呼吸（增强脉冲感）
+  - 伴星：双星各加光晕
+- **交互增强**：
+  - 单击天体自动聚焦相机（需求 7.3.2）
+  - 第一人称提示文案改为"第一人称巡游"
+  - 父子连线 `connectionLines` 每帧更新位置
+  - 轨道线跟随父星漂移位置
+- **杂项**：
+  - 清理死的 `createStarfield`（从未挂载）
+  - 移除 unmount 里对不存在的 `_nebulaSprites/_dustParticles` 的引用（会导致卸载报错）
+  - `replaceWithSnapshot` 统一走 `rebuildOrbitAndConnectionLines`
+  - 内联 SVG favicon，消除 `/favicon.ico` 404
+- **下一步**：可继续做演化事件动画（新恒星诞生/超新星爆发/星云变色）和导出视频/glTF
