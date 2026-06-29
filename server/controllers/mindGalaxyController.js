@@ -15,6 +15,7 @@ import configService from '../services/mindGalaxy/configService.js';
 import { generateReport } from '../services/mindGalaxy/reportService.js';
 import { exportData, exportReportPDF } from '../services/mindGalaxy/exportService.js';
 import MindGalaxyRepository from '../repositories/mindGalaxyRepository.js';
+import { generateGalaxyEngine } from '../services/mindGalaxy/galaxyEngineService.js';
 
 const repo = new MindGalaxyRepository();
 
@@ -498,6 +499,17 @@ export const aggregateResult = asyncHandler(async (req, res) => {
   return success(res, data);
 });
 
+// ── UGME v2.0 通用星系转译引擎 ──
+export const generateByEngine = asyncHandler(async (req, res) => {
+  const { domain, sources, bucketBy, model } = req.body || {};
+  if (!domain) return fail(res, '缺少 domain', 400);
+  if (!Array.isArray(sources) || sources.length === 0) {
+    return fail(res, '缺少 sources 或为空', 400);
+  }
+  const result = await generateGalaxyEngine(req.user.id, { domain, sources, bucketBy, model });
+  return success(res, result);
+});
+
 export default {
   // legacy
   getGalaxyFromNotes, getGalaxyFromKnowledgeBase, getMixedGalaxy,
@@ -515,5 +527,7 @@ export default {
   inviteRelationship, acceptRelationship, revokeRelationship,
   listRelationshipInvitations, getRelationshipGraphHandler,
   // aggregate
-  aggregateJoin, aggregateResult
+  aggregateJoin, aggregateResult,
+  // ugme engine
+  generateByEngine
 };

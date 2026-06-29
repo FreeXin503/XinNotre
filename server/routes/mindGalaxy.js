@@ -10,7 +10,8 @@ import {
   mergePersons, updatePersonIntimacy, listPersons,
   inviteRelationship, acceptRelationship, revokeRelationship,
   listRelationshipInvitations, getRelationshipGraphHandler,
-  aggregateJoin, aggregateResult
+  aggregateJoin, aggregateResult,
+  generateByEngine
 } from '../controllers/mindGalaxyController.js';
 import { aiGuideStream } from '../controllers/mindGalaxyGuideController.js';
 import { startSocraticSession, socraticStepHandler } from '../controllers/socraticController.js';
@@ -90,5 +91,8 @@ router.get('/belief-check/history', authMiddleware, getBeliefHistoryHandler);
 router.post('/digital-twin/evolve', authMiddleware, evolveDigitalTwinHandler);
 router.get('/digital-twin/list', authMiddleware, listDigitalTwinsHandler);
 router.post('/digital-twin/chat', authMiddleware, chatWithPastSelfHandler);
+
+// ── UGME v2.0 通用星系转译引擎 ──
+router.post('/engine/generate', authMiddleware, generateByEngine);
 
 export default router;
