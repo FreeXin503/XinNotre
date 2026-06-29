@@ -3,6 +3,7 @@
  */
 import { success, fail, asyncHandler } from '../utils/response.js';
 import { setupSSE, sendSSE } from '../utils/sse.js';
+import { query } from '../config/database.js';
 import {
   generateGalaxyFromNotes, generateGalaxyFromKnowledgeBase, generateMixedGalaxy
 } from '../services/mindGalaxyService.js';
@@ -16,6 +17,7 @@ import { generateReport } from '../services/mindGalaxy/reportService.js';
 import { exportData, exportReportPDF } from '../services/mindGalaxy/exportService.js';
 import MindGalaxyRepository from '../repositories/mindGalaxyRepository.js';
 import { generateGalaxyEngine } from '../services/mindGalaxy/galaxyEngineService.js';
+import noteRepository from '../repositories/noteRepository.js';
 
 const repo = new MindGalaxyRepository();
 
@@ -500,12 +502,47 @@ export const aggregateResult = asyncHandler(async (req, res) => {
 });
 
 // ── UGME v2.0 通用星系转译引擎 ──
+
+/**
+ * 根据 domain 自动从数据库拉取 sources 数据
+ */
+async function autoFetchSources(userId, domain) {
+  let items;
+  if (domain === 'KnowledgeGalaxy') {
+    const kbResult = await query(
+      `SELECT n.id, n.title, n.content, n.updated_at
+       FROM knowledge_base_notes kbn
+       JOIN notes n ON n.id = kbn.note_id
+       WHERE n.user_id = ?
+       ORDER BY n.updated_at DESC
+       LIMIT 200`,
+      [userId]
+    );
+    items = kbResult.rows;
+  } else {
+    const result = await noteRepository.findByUserId(userId, { pageSize: 200 });
+    items = result.items;
+  }
+
+  return (items || []).map(item => ({
+    id: item.id,
+    timestamp: item.updated_at || item.created_at || new Date().toISOString(),
+    content: (item.title || '') + ' ' + (item.content || '')
+  })).filter(s => s.content.trim().length > 10);
+}
+
 export const generateByEngine = asyncHandler(async (req, res) => {
-  const { domain, sources, bucketBy, model } = req.body || {};
+  let { domain, sources, bucketBy, model, autoFetch } = req.body || {};
   if (!domain) return fail(res, '缺少 domain', 400);
+
+  if (autoFetch && (!Array.isArray(sources) || sources.length === 0)) {
+    sources = await autoFetchSources(req.user.id, domain);
+  }
+
   if (!Array.isArray(sources) || sources.length === 0) {
     return fail(res, '缺少 sources 或为空', 400);
   }
+
   const result = await generateGalaxyEngine(req.user.id, { domain, sources, bucketBy, model });
   return success(res, result);
 });
