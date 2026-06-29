@@ -396,6 +396,28 @@ function boot() {
   const pp = initPostProcessing(rs, { strength: 0.35, radius: 0.4, threshold: 0.3 });
   renderer.__pp = pp;
 
+  window.addEventListener('mg-post-processing-change', () => {
+    if (!window.mgPostProcessing) return;
+    const s = window.mgPostProcessing;
+    if (pp.bloomPass) {
+      pp.bloomPass.strength = s.bloom.enabled ? s.bloom.strength : 0;
+    }
+    if (pp.passes) {
+      if (pp.passes.dof) {
+        pp.passes.dof.enabled = s.dof.enabled;
+        pp.passes.dof.uniforms.blur.value = s.dof.aperture * 100;
+        // DoF focus distance is a bit complex in basic shaders, we just map blur scale here
+      }
+      if (pp.passes.grain) {
+        pp.passes.grain.enabled = s.film.enabled;
+      }
+      if (pp.passes.vignette) {
+        pp.passes.vignette.enabled = s.film.enabled;
+        pp.passes.vignette.uniforms.intensity.value = s.film.enabled ? 0.35 : 0;
+      }
+    }
+  });
+
   createSkybox(scene);
   backdrop = createGalaxyBackdrop(scene);
 

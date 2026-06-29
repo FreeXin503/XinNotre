@@ -97,6 +97,26 @@ export function initUI() {
     document.getElementById('bottom-panel')?.classList.toggle('collapsed');
   });
 
+  // Social & Digital Twin panel toggles
+  document.getElementById('btn-social')?.addEventListener('click', () => {
+    document.getElementById('social-panel')?.classList.toggle('visible');
+    // Hide others
+    document.getElementById('digital-twin-panel')?.classList.remove('visible');
+    document.getElementById('socratic-panel')?.classList.remove('visible');
+  });
+  
+  // (Note: Digital Twin button is also handled by its own init function, but we can manage exclusive visibility here)
+  document.getElementById('btn-digital-twin')?.addEventListener('click', () => {
+    document.getElementById('social-panel')?.classList.remove('visible');
+    document.getElementById('socratic-panel')?.classList.remove('visible');
+  });
+  
+  document.getElementById('btn-socratic')?.addEventListener('click', () => {
+    document.getElementById('social-panel')?.classList.remove('visible');
+    document.getElementById('digital-twin-panel')?.classList.remove('visible');
+    document.getElementById('socratic-panel')?.classList.toggle('visible');
+  });
+
   // 实时分析预览
   const diaryInput = document.getElementById('diary-input');
   if (diaryInput) {
@@ -342,6 +362,7 @@ function initSettings() {
           <button class="settings-tab" data-panel="mapping">映射规则</button>
           <button class="settings-tab" data-panel="poster">分享海报</button>
           <button class="settings-tab" data-panel="report">解读报告</button>
+          <button class="settings-tab" data-panel="effects">高级滤镜</button>
         </div>
         <div id="settings-body" style="padding:20px;"></div>
         <div style="padding:0 20px 20px;text-align:right;">
@@ -379,6 +400,7 @@ function switchPanel(name) {
     case 'mapping': renderMappingPanel(body); break;
     case 'poster': renderPosterPanel(body); break;
     case 'report': renderReportPanel(body); break;
+    case 'effects': renderEffectsPanel(body); break;
   }
 }
 
@@ -407,6 +429,75 @@ function renderPrivacyPanel(body) {
   body.querySelector('#toggle-after-delete').addEventListener('change', (e) => {
     localStorage.setItem('mg_afterDelete', JSON.stringify(e.target.checked));
   });
+}
+
+function renderEffectsPanel(body) {
+  body.innerHTML = `
+    <h4 style="margin:0 0 16px;color:#4fc3f7;">科幻级渲染滤镜 (Post-processing)</h4>
+    <p style="font-size:0.8rem;color:#888;margin-bottom:16px;">调节高级视觉效果。开启多重滤镜可能会增加 GPU 负担。</p>
+    
+    <div class="pp-settings-group">
+      <div class="pp-setting-item">
+        <label><input type="checkbox" id="pp-bloom-enable" checked> 辉光 (Bloom)</label>
+      </div>
+      <div class="pp-setting-item">
+        <span>强度</span><input type="range" id="pp-bloom-strength" class="pp-slider" min="0" max="3" step="0.1" value="1.5">
+      </div>
+    </div>
+
+    <div class="pp-settings-group">
+      <div class="pp-setting-item">
+        <label><input type="checkbox" id="pp-dof-enable"> 景深 (Depth of Field)</label>
+      </div>
+      <div class="pp-setting-item">
+        <span>焦距</span><input type="range" id="pp-dof-focus" class="pp-slider" min="10" max="1000" step="10" value="100">
+      </div>
+      <div class="pp-setting-item">
+        <span>光圈</span><input type="range" id="pp-dof-aperture" class="pp-slider" min="0.001" max="0.1" step="0.001" value="0.01">
+      </div>
+    </div>
+
+    <div class="pp-settings-group">
+      <div class="pp-setting-item">
+        <label><input type="checkbox" id="pp-film-enable"> 胶片颗粒 & 暗角 (Film Grain & Vignette)</label>
+      </div>
+    </div>
+  `;
+
+  // Update window variables that renderer.js can read
+  if (!window.mgPostProcessing) {
+    window.mgPostProcessing = {
+      bloom: { enabled: true, strength: 1.5 },
+      dof: { enabled: false, focus: 100, aperture: 0.01 },
+      film: { enabled: false }
+    };
+  }
+
+  const bindToggle = (id, cat) => {
+    const el = body.querySelector('#' + id);
+    if (!el) return;
+    el.checked = window.mgPostProcessing[cat].enabled;
+    el.addEventListener('change', e => {
+      window.mgPostProcessing[cat].enabled = e.target.checked;
+      window.dispatchEvent(new Event('mg-post-processing-change'));
+    });
+  };
+  const bindSlider = (id, cat, prop) => {
+    const el = body.querySelector('#' + id);
+    if (!el) return;
+    el.value = window.mgPostProcessing[cat][prop];
+    el.addEventListener('input', e => {
+      window.mgPostProcessing[cat][prop] = parseFloat(e.target.value);
+      window.dispatchEvent(new Event('mg-post-processing-change'));
+    });
+  };
+
+  bindToggle('pp-bloom-enable', 'bloom');
+  bindSlider('pp-bloom-strength', 'bloom', 'strength');
+  bindToggle('pp-dof-enable', 'dof');
+  bindSlider('pp-dof-focus', 'dof', 'focus');
+  bindSlider('pp-dof-aperture', 'dof', 'aperture');
+  bindToggle('pp-film-enable', 'film');
 }
 
 // ── C33: 隐藏列表面板 ──
