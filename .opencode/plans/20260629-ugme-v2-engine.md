@@ -37,7 +37,7 @@
 
 ---
 
-## 卡片 C1：类型定义 + 校验器
+## 卡片 C1：类型定义 + 校验器 ✅ done
 
 **目标**：在 mindGalaxyTypes.js 追加 UGME 引擎的类型契约和校验器。
 
@@ -113,7 +113,7 @@ const CELESTIAL_ROLES = ['BlackHole', 'MainStar', 'Planet', 'Nebula', 'Asteroid'
 
 ---
 
-## 卡片 C2：UGME v2.0 分层 prompt 模板
+## 卡片 C2：UGME v2.0 分层 prompt 模板 ✅ done
 
 **目标**：新建 prompt 模块，包含 4 域解构矩阵 + 分层 prompt 构建函数。LLM 只输出 semantic_features，绝不输出 size/brightness/color 等物理参数。
 
@@ -174,7 +174,7 @@ export function buildEnginePrompt(domain, timeBuckets) { ... }
 
 ---
 
-## 卡片 C3：后处理映射纯函数
+## 卡片 C3：后处理映射纯函数 ✅ done
 
 **目标**：新建纯函数模块，把 LLM 输出的 semantic_features 映射成 bodies[] 的 visual/motion 物理参数。全部确定性计算，不调 LLM。
 
@@ -241,7 +241,7 @@ export function mapSnapshotToBodies(engineSnapshot) { ... }
 
 ---
 
-## 卡片 C4：引擎核心服务
+## 卡片 C4：引擎核心服务 ✅ done
 
 **目标**：新建引擎服务，串联数据准备 → prompt 构建 → LLM 调用 → JSON 解析 → 后处理映射 → 多 snapshot 组装。
 
@@ -296,7 +296,7 @@ export async function generateGalaxyEngine(userId, params) { ... }
 
 ---
 
-## 卡片 C5：controller + route
+## 卡片 C5：controller + route ✅ done
 
 **目标**：新增 engine generate handler 和 route，与现有 endpoint 并行。
 
@@ -332,7 +332,7 @@ router.post('/engine/generate', authMiddleware, generateByEngine);
 
 ---
 
-## 卡片 C6：验证
+## 卡片 C6：验证 ✅ done
 
 **目标**：lint + typecheck + 冒烟测试。
 

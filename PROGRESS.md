@@ -388,3 +388,24 @@
   - `replaceWithSnapshot` 统一走 `rebuildOrbitAndConnectionLines`
   - 内联 SVG favicon，消除 `/favicon.ico` 404
 - **下一步**：可继续做演化事件动画（新恒星诞生/超新星爆发/星云变色）和导出视频/glTF
+
+### 2026-06-29: ��ʵ������ϵδ����ģ��
+- **�����ʲô**: ʵ������������ (D10) ǰ�˶Ի���� digitalTwin.js���罻��������ϵ (D5/D6) UI ��ܣ��Լ��ƻü��߼���Ⱦ�˾���Bloom, DoF, Vignette, Film Grain���Ķ�̬���ڡ�
+- **����ʲô**: ��˶�Ӧ�ĸ߼��˾����ñ��棨��ѡ����������ϵ�������ӵ�ʵ�ʼ�Ȩ�ȹ��ܴ������Խӡ�
+- **�ؼ���ƾ���**: ���� Three.js EffectComposer ʵ�ֺ����˾�������ǰ��ά�� window.mgPostProcessing ȫ��״̬�Ա� UI �� 3D ��Ⱦ�������罻������������帴����ë���� UI ������
+- **��һ��Ҫ��ʲô**: ��һ������ H5 ����ʽ�������ܻ�����ģ�顣
+
+### 2026-06-29: UGME v2.0 通用星系转译引擎落地
+
+- **做了什么**: C1 完成 - 在 mindGalaxyTypes.js 追加 UGME 引擎类型契约（ENGINE_DOMAINS/CELESTIAL_ROLES 常量 + validateSemanticFeatures/validateEngineSnapshot/validateEngineMultiSnapshot 校验器）。定义了 LLM 输出语义特征层（frequency/sentiment_polarity/emotion_labels 等），不含物理参数。
+- **还差什么**: C2 分层 prompt 模板 / C3 后处理映射纯函数 / C4 引擎核心服务 / C5 controller+route / C6 验证
+- **关键设计决策**: LLM 只输出 semantic_features（语义特征），代码算 metrics（size/brightness/color）。颜色用 EMOTION_COLORS 查表，不让 LLM 生成 HEX。多时间切片一次调用输出，节点命名全局一致。前端契约不变（bodies[] 扁平数组）。与现有 nlpDeepService 心理学路径并行，新 endpoint /engine/generate。
+- **下一步**: C2 - 新建 galaxyEnginePrompt.js，4 域解构矩阵 + 分层 prompt（禁止 LLM 输出物理参数）
+
+### 2026-06-29: UGME v2.0 通用星系转译引擎 - 全部完成
+
+- **做了什么**: C1-C6 全部落地。新建 3 个文件（galaxyEnginePrompt.js / galaxyEngineMapper.js / galaxyEngineService.js），修改 3 个文件（mindGalaxyTypes.js / mindGalaxyController.js / mindGalaxy.js route）。新增 endpoint POST /api/mind-galaxy/engine/generate。
+- **架构**: LLM 只输出 semantic_features（frequency/sentiment_polarity/emotion_labels 等语义特征）→ 代码后处理 mapFeaturesToMetrics 算 size/brightness/color（颜色查 EMOTION_COLORS_MAP 表，不让 LLM 生成 HEX）→ mapSnapshotToBodies 输出 bodies[] 扁平数组（前端零改动）。支持 4 业务域 + 多时间切片（一次调用多 snapshot，节点 id 跨切片一致）。
+- **关键设计决策**: (1) LLM 不算数学——对数/乘法链全在代码侧 (2) 颜色查表不让 LLM 生成 HEX (3) 多时间切片一次调用保证命名一致 (4) 与现有 nlpDeepService 心理学路径并行 (5) 前端契约不变
+- **验证**: import 链 OK / 4 domains 6 roles 20 emotions / 校验器拒非法+接合法 / 冒烟测试 mapFeaturesToMetrics+mapSnapshotToBodies 输出正确（颜色查表/black_hole 居中/planet parent 指向 mainstar）
+- **下一步**: 可接入前端调用 /engine/generate 测试真实 LLM 输出；后续可加 embedding 节点对齐做真增量更新
