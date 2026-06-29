@@ -49,6 +49,46 @@ export function initUI() {
   bindImport('btn-import-kb', 'kb');
   bindImport('btn-import-mixed', 'mixed');
 
+  // UGME 引擎生成
+  document.getElementById('btn-ugme-generate')?.addEventListener('click', async () => {
+    const domain = document.getElementById('ugme-domain')?.value || 'MindGalaxy';
+    const statusEl = document.getElementById('ugme-status');
+    const statusText = document.getElementById('ugme-status-text');
+    const btn = document.getElementById('btn-ugme-generate');
+    if (!statusEl || !statusText || !btn) return;
+
+    statusEl.style.display = 'flex';
+    statusText.textContent = '引擎生成中...';
+    btn.disabled = true;
+
+    try {
+      const { ApiClient } = await import('../../api.js');
+      const client = ApiClient;
+      const res = await client.generateByEngine({ domain, autoFetch: true });
+      if (!res?.success || !res.data?.snapshots?.length) {
+        statusText.textContent = '引擎未返回有效数据';
+        return;
+      }
+
+      statusText.textContent = `生成完成 (${res.data.domain}, ${res.data.snapshots.length} 个快照)`;
+
+      const { setSnapshots, replaceWithSnapshot } = await import('./index.js');
+      const wrappedSnapshots = res.data.snapshots.map(s => ({
+        snapshot_json: s,
+        created_at: s.time_snapshot ? new Date(s.time_snapshot + '-01').toISOString() : new Date().toISOString()
+      }));
+      setSnapshots(wrappedSnapshots);
+      await replaceWithSnapshot(wrappedSnapshots.length - 1, false);
+
+      setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+    } catch (e) {
+      statusText.textContent = '生成失败: ' + e.message;
+      statusEl.style.borderColor = 'var(--danger)';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   // Analyze button: SSE stream
   document.getElementById('btn-analyze')?.addEventListener('click', async () => {
     const text = document.getElementById('diary-input')?.value?.trim();

@@ -587,5 +587,12 @@ export const ApiClient = {
     return this.request(`/mind-galaxy/export/${format}`, {
       method: 'POST', headers: this.getHeaders()
     });
+  },
+
+  async generateByEngine(payload) {
+    return this.request('/mind-galaxy/engine/generate', {
+      method: 'POST', headers: this.getHeaders(),
+      body: JSON.stringify(payload)
+    });
   }
 };

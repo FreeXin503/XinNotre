@@ -523,6 +523,35 @@ const MOCK_API = {
     success: true,
     data: { memoirs: [] },
     timestamp: new Date().toISOString()
+  }),
+
+  '/api/mind-galaxy/engine/generate': () => ({
+    success: true,
+    data: {
+      domain: 'MindGalaxy',
+      snapshots: [{
+        id: 'mock-ugme-1',
+        galaxyType: 'S',
+        spiralArms: 3,
+        overall_type: 'Spiral',
+        summary: 'UGME 引擎模拟生成的星系快照',
+        structural_metrics: { entropy: 0.65, density: 0.32, active_index: 0.48 },
+        bodies: [
+          { id: 'ug_b0', type: 'black_hole', name: '核心自我', position: [0,0,0], visual: { radius: 5, colorHex: '#111122', emissiveIntensity: 3 }, spawnAnimation: 'none', meta: { source: 'ugme', insight: '你的意识核心' } },
+          { id: 'ug_b1', type: 'giant_star', name: '成长信念', position: [0,0,0], visual: { radius: 2.8, colorHex: '#FFD700', emissiveIntensity: 2.2 }, spawnAnimation: 'none', meta: { belief: { level: 'core', polarity: 'pos', strength: 0.85 } } },
+          { id: 'ug_b2', type: 'giant_star', name: '探索未知', position: [0,0,0], visual: { radius: 2.5, colorHex: '#FF69B4', emissiveIntensity: 2.0 }, spawnAnimation: 'none', meta: { belief: { level: 'core', polarity: 'pos', strength: 0.78 } } },
+          { id: 'ug_b3', type: 'main_sequence', name: '学习精进', position: [0,0,0], visual: { radius: 2.0, colorHex: '#00CED1', emissiveIntensity: 1.5 }, spawnAnimation: 'none', meta: { theme: { importance: 0.7, trend: 'growing' } } },
+          { id: 'ug_b4', type: 'main_sequence', name: '社交关系', position: [0,0,0], visual: { radius: 1.8, colorHex: '#FF6347', emissiveIntensity: 1.3 }, spawnAnimation: 'none', meta: { theme: { importance: 0.6, trend: 'stable' } } },
+          { id: 'ug_b5', type: 'planet_system', name: '编程技能', position: [0,0,0], visual: { radius: 0.9, colorHex: '#98FB98', emissiveIntensity: 1 }, motion: { parentBodyId: 'ug_b3', orbitRadius: 5, orbitInclination: 0.2, orbitSpeed: 0.5, orbitPhase: 1, eccentricity: 0.15 }, spawnAnimation: 'none', meta: {} },
+          { id: 'ug_b6', type: 'planet_system', name: '沟通协作', position: [0,0,0], visual: { radius: 0.8, colorHex: '#FFB6C1', emissiveIntensity: 0.9 }, motion: { parentBodyId: 'ug_b4', orbitRadius: 4.2, orbitInclination: -0.15, orbitSpeed: 0.6, orbitPhase: 2, eccentricity: 0.1 }, spawnAnimation: 'none', meta: {} },
+          { id: 'ug_b7', type: 'nebula', name: '喜悦星云', position: [0,0,0], visual: { radius: 0.2, colorHex: '#FFD700', emissiveIntensity: 1, density: 0.7, particleCount: 3000 }, spawnAnimation: 'none', meta: {} },
+          { id: 'ug_b8', type: 'nebula', name: '沉思星云', position: [0,0,0], visual: { radius: 0.2, colorHex: '#4169E1', emissiveIntensity: 0.7, density: 0.5, particleCount: 2000 }, spawnAnimation: 'none', meta: {} },
+          { id: 'ug_b9', type: 'asteroid_belt', name: '碎片记忆', position: [0,0,0], visual: { radius: 0.05, colorHex: '#8888AA', emissiveIntensity: 0.5, particleCount: 600 }, spawnAnimation: 'none', meta: {} },
+          { id: 'ug_b10', type: 'dark_matter', name: '潜意识', position: [0,0,0], visual: { radius: 0.15, colorHex: '#222244', emissiveIntensity: 0.2, opacity: 0.35 }, spawnAnimation: 'none', meta: { shadow: { repression: 0.6, energy: 0.4 } } }
+        ]
+      }]
+    },
+    timestamp: new Date().toISOString()
   })
 };
 
