@@ -345,3 +345,173 @@ export function validateGalaxyConfig(data) {
 
   return { valid: errors.length === 0, errors };
 }
+
+// ════════════════════════════════════════════════════════════
+// UGME v2.0 通用星系转译引擎 · 类型与校验
+// ════════════════════════════════════════════════════════════
+
+const ENGINE_DOMAINS = ['MindGalaxy', 'KnowledgeGalaxy', 'RelationshipGalaxy', 'OrgGalaxy'];
+const CELESTIAL_ROLES = ['BlackHole', 'MainStar', 'Planet', 'Nebula', 'Asteroid', 'DarkMatter'];
+const OVERALL_TYPES = ['Spiral', 'Elliptical', 'BarredSpiral', 'Irregular'];
+const ENGINE_EDGE_TYPES = ['triggers', 'supports', 'correlates', 'derives', 'represses'];
+
+/**
+ * @typedef {Object} SemanticFeatures — LLM 输出的语义特征（不含物理参数）
+ * @property {number} frequency - 出现频次
+ * @property {number} sentiment_polarity - 情感极性 [-1, 1]
+ * @property {number} degree_centrality - 关联边数
+ * @property {number} first_seen_month - 首次出现距今天数
+ * @property {string[]} emotion_labels - 情绪标签（20 种枚举）
+ * @property {string} celestial_role - 天体语义角色
+ * @property {number[]} source_evidence - 原始数据 ID
+ * @property {string} insight - AI 洞察
+ */
+
+/**
+ * @typedef {Object} EngineNode — LLM 输出节点（只含语义层）
+ * @property {string} id
+ * @property {string} name
+ * @property {string} celestial_role
+ * @property {string|null} parent_id
+ * @property {SemanticFeatures} semantic_features
+ */
+
+/**
+ * @typedef {Object} EngineEdge
+ * @property {string} source
+ * @property {string} target
+ * @property {string} relation_type
+ * @property {number} strength
+ */
+
+/**
+ * @typedef {Object} EngineSnapshot — 单时间切片
+ * @property {string} time_snapshot
+ * @property {string} overall_type
+ * @property {Object} structural_metrics
+ * @property {number} structural_metrics.entropy
+ * @property {number} structural_metrics.density
+ * @property {number} structural_metrics.active_index
+ * @property {string} summary
+ * @property {EngineNode[]} nodes
+ * @property {EngineEdge[]} edges
+ */
+
+/**
+ * @typedef {Object} EngineMultiSnapshot — 多时间切片输出
+ * @property {string} domain
+ * @property {EngineSnapshot[]} snapshots
+ */
+
+/**
+ * @param {*} data
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+export function validateSemanticFeatures(data) {
+  const errors = [];
+  if (!isPlainObject(data)) return { valid: false, errors: ['semantic_features 必须为非空对象'] };
+
+  errors.push(...checkRange(data.frequency, 0, Infinity, 'frequency'));
+  errors.push(...checkRange(data.sentiment_polarity, -1, 1, 'sentiment_polarity'));
+  errors.push(...checkRange(data.degree_centrality, 0, Infinity, 'degree_centrality'));
+  errors.push(...checkRange(data.first_seen_month, 0, Infinity, 'first_seen_month'));
+
+  if (!Array.isArray(data.emotion_labels)) {
+    errors.push('emotion_labels 必须为数组');
+  }
+  if (!CELESTIAL_ROLES.includes(data.celestial_role)) {
+    errors.push(`celestial_role 必须为 ${CELESTIAL_ROLES.join('|')}，实际为 ${data.celestial_role}`);
+  }
+  if (!Array.isArray(data.source_evidence)) {
+    errors.push('source_evidence 必须为数组');
+  }
+  if (typeof data.insight !== 'string') {
+    errors.push('insight 必须为字符串');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * @param {*} data
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+export function validateEngineSnapshot(data) {
+  const errors = [];
+  if (!isPlainObject(data)) return { valid: false, errors: ['EngineSnapshot 必须为非空对象'] };
+
+  if (!isNonEmptyString(data.time_snapshot)) errors.push('time_snapshot 为必填非空字符串');
+  if (!OVERALL_TYPES.includes(data.overall_type)) {
+    errors.push(`overall_type 必须为 ${OVERALL_TYPES.join('|')}，实际为 ${data.overall_type}`);
+  }
+
+  const sm = data.structural_metrics;
+  if (!isPlainObject(sm)) {
+    errors.push('structural_metrics 为必填对象');
+  } else {
+    errors.push(...checkRange(sm.entropy, 0, 1, 'structural_metrics.entropy'));
+    errors.push(...checkRange(sm.density, 0, 1, 'structural_metrics.density'));
+    errors.push(...checkRange(sm.active_index, 0, 1, 'structural_metrics.active_index'));
+  }
+
+  if (typeof data.summary !== 'string') errors.push('summary 必须为字符串');
+
+  if (!Array.isArray(data.nodes)) {
+    errors.push('nodes 必须为数组');
+  } else {
+    data.nodes.forEach((n, i) => {
+      const pre = `nodes[${i}]`;
+      if (!isNonEmptyString(n.id)) errors.push(`${pre}.id 为必填`);
+      if (!isNonEmptyString(n.name)) errors.push(`${pre}.name 为必填`);
+      if (!CELESTIAL_ROLES.includes(n.celestial_role)) {
+        errors.push(`${pre}.celestial_role 必须为 ${CELESTIAL_ROLES.join('|')}`);
+      }
+      if (n.parent_id !== null && !isNonEmptyString(n.parent_id)) {
+        errors.push(`${pre}.parent_id 必须为 null 或非空字符串`);
+      }
+      const sf = validateSemanticFeatures(n.semantic_features);
+      if (!sf.valid) errors.push(...sf.errors.map(e => `${pre}.semantic_features: ${e}`));
+    });
+  }
+
+  if (!Array.isArray(data.edges)) {
+    errors.push('edges 必须为数组');
+  } else {
+    data.edges.forEach((e, i) => {
+      const pre = `edges[${i}]`;
+      if (!isNonEmptyString(e.source)) errors.push(`${pre}.source 为必填`);
+      if (!isNonEmptyString(e.target)) errors.push(`${pre}.target 为必填`);
+      if (!ENGINE_EDGE_TYPES.includes(e.relation_type)) {
+        errors.push(`${pre}.relation_type 必须为 ${ENGINE_EDGE_TYPES.join('|')}`);
+      }
+      errors.push(...checkRange(e.strength, 0, 1, `${pre}.strength`));
+    });
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * @param {*} data
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+export function validateEngineMultiSnapshot(data) {
+  const errors = [];
+  if (!isPlainObject(data)) return { valid: false, errors: ['EngineMultiSnapshot 必须为非空对象'] };
+
+  if (!ENGINE_DOMAINS.includes(data.domain)) {
+    errors.push(`domain 必须为 ${ENGINE_DOMAINS.join('|')}，实际为 ${data.domain}`);
+  }
+  if (!Array.isArray(data.snapshots) || data.snapshots.length === 0) {
+    errors.push('snapshots 必须为非空数组');
+  } else {
+    data.snapshots.forEach((s, i) => {
+      const r = validateEngineSnapshot(s);
+      if (!r.valid) errors.push(...r.errors.map(e => `snapshots[${i}]: ${e}`));
+    });
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+export { ENGINE_DOMAINS, CELESTIAL_ROLES, OVERALL_TYPES, ENGINE_EDGE_TYPES };
